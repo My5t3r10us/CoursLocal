@@ -41,6 +41,7 @@ struct CourseView: View {
     @State private var transcriptFilter = ""
     @State private var scrollTarget: String?
     @State private var toast: String?
+    @State private var columnWidth: CGFloat = 1000
 
     init(course: Course, store: CourseStore, player: CourseAudioPlayer, gate: OperationGate, assistant: CourseAssistant, process: @escaping (ProcessMode) -> Void, reimport: @escaping () -> Void, delete: @escaping () -> Void = {}) {
         self.course = course; self.store = store; self.player = player; self.gate = gate; self.assistant = assistant
@@ -53,6 +54,8 @@ struct CourseView: View {
     private var processingThis: Bool { [.transcribing, .generating].contains(course.state) && gate.busy }
     private var groups: [ThemeGroup] { course.themeGroups }
     private var tabs: [CourseTab] { CourseTab.allCases.filter { $0 != .archive || course.legacyMarkdown != nil } }
+    /// Narrow column (small window, questions or outline panel open): header and controls stack vertically.
+    private var compact: Bool { columnWidth < 680 }
     private var needsSheet: Bool { generateSheet && course.documentComplete && !course.sheetComplete }
     private var needsProcessing: Bool { !course.documentComplete || course.state == .failed || course.state == .interrupted || needsSheet }
     private var processLabel: String {
@@ -71,10 +74,11 @@ struct CourseView: View {
                             tabBar
                             content
                         }
-                        .padding(.horizontal, 36).padding(.top, 28).padding(.bottom, 48)
+                        .padding(.horizontal, compact ? 22 : 36).padding(.top, compact ? 20 : 28).padding(.bottom, 48)
                         .frame(maxWidth: 860, alignment: .leading)
                         .frame(maxWidth: .infinity)
                     }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { columnWidth = $0 }
                     .onChange(of: scrollTarget) { _, target in
                         guard let target else { return }
                         withAnimation(.smooth) { proxy.scrollTo(target, anchor: .top) }
@@ -125,37 +129,45 @@ struct CourseView: View {
 
     // MARK: Header
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 10) {
-                    StateBadge(state: course.state)
-                    Text(course.createdAt.formatted(date: .complete, time: .shortened)).font(.callout).foregroundStyle(.secondary)
-                }
-                Text(course.title).font(.system(size: 30, weight: .bold)).textSelection(.enabled).lineLimit(3)
-                    .onTapGesture(count: 2) { if !gate.busy { sheet = .rename } }
-                    .help("Double-clique pour renommer")
-                HStack(spacing: 16) {
-                    MetaLabel(symbol: "clock", text: shortDuration(course.duration))
-                    MetaLabel(symbol: course.captureMode.symbol, text: course.applicationName.map { "\(course.captureMode.label) · \($0)" } ?? course.captureMode.label)
-                    if course.hasDocument {
-                        MetaLabel(symbol: "square.stack.3d.up", text: groups.count == 1 ? "1 thème" : "\(groups.count) thèmes")
-                        MetaLabel(symbol: "text.alignleft", text: "\(course.wordCount.formatted()) mots")
-                    }
+    @ViewBuilder private var header: some View {
+        if compact {
+            VStack(alignment: .leading, spacing: 14) { headerInfo; headerActions }
+        } else {
+            HStack(alignment: .top, spacing: 16) { headerInfo; Spacer(minLength: 16); headerActions }
+        }
+    }
+
+    private var headerInfo: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                StateBadge(state: course.state)
+                Text(course.createdAt.formatted(date: .complete, time: .shortened)).font(.callout).foregroundStyle(.secondary)
+            }
+            Text(course.title).font(.system(size: 30, weight: .bold)).textSelection(.enabled).lineLimit(3)
+                .onTapGesture(count: 2) { if !gate.busy { sheet = .rename } }
+                .help("Double-clique pour renommer")
+            FlowLayout(spacing: 16, lineSpacing: 6) {
+                MetaLabel(symbol: "clock", text: shortDuration(course.duration))
+                MetaLabel(symbol: course.captureMode.symbol, text: course.applicationName.map { "\(course.captureMode.label) · \($0)" } ?? course.captureMode.label)
+                if course.hasDocument {
+                    MetaLabel(symbol: "square.stack.3d.up", text: groups.count == 1 ? "1 thème" : "\(groups.count) thèmes")
+                    MetaLabel(symbol: "text.alignleft", text: "\(course.wordCount.formatted()) mots")
                 }
             }
-            Spacer(minLength: 16)
-            HStack(spacing: 8) {
-                if needsProcessing {
-                    Button { process(.normal) } label: {
-                        Label(processLabel, systemImage: needsSheet && course.documentComplete ? "list.bullet.rectangle" : "wand.and.stars")
-                    }.buttonStyle(.borderedProminent).controlSize(.large).disabled(!canProcess)
-                } else {
-                    Button(action: export) { Label("Exporter vers Obsidian", systemImage: "square.and.arrow.up") }
-                        .buttonStyle(.borderedProminent).controlSize(.large)
-                }
-                moreMenu
+        }
+    }
+
+    private var headerActions: some View {
+        HStack(spacing: 8) {
+            if needsProcessing {
+                Button { process(.normal) } label: {
+                    Label(processLabel, systemImage: needsSheet && course.documentComplete ? "list.bullet.rectangle" : "wand.and.stars")
+                }.buttonStyle(.borderedProminent).controlSize(.large).disabled(!canProcess)
+            } else {
+                Button(action: export) { Label("Exporter vers Obsidian", systemImage: "square.and.arrow.up") }
+                    .buttonStyle(.borderedProminent).controlSize(.large)
             }
+            moreMenu
         }
     }
 
@@ -217,37 +229,67 @@ struct CourseView: View {
 
     // MARK: Tabs
 
+    /// Everything on one line when it fits; otherwise the tab-specific controls wrap below,
+    /// and in a very narrow column the segmented control becomes a menu.
     private var tabBar: some View {
-        HStack(spacing: 12) {
-            Picker("Vue", selection: $tab) { ForEach(tabs) { Text($0.rawValue).tag($0) } }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
-            Spacer()
-            switch tab {
-            case .document where course.hasDocument:
-                Picker("Organisation", selection: $layout) { ForEach(DocumentLayout.allCases) { Text($0.label).tag($0) } }
-                    .pickerStyle(.menu).labelsHidden().fixedSize().help("Organisation du document et de l’export")
-                Button { showOutline.toggle() } label: { Image(systemName: "sidebar.right") }
-                    .buttonStyle(.borderless).help(showOutline ? "Masquer le plan" : "Afficher le plan")
-            case .transcript where !course.sources.isEmpty:
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                    TextField("Filtrer la transcription", text: $transcriptFilter).textFieldStyle(.plain)
-                    if !transcriptFilter.isEmpty { Button { transcriptFilter = "" } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.borderless).foregroundStyle(.secondary) }
-                }
-                .padding(.horizontal, 8).padding(.vertical, 5).frame(width: 240)
-                .background(RoundedRectangle(cornerRadius: 7).fill(.quaternary.opacity(0.5)))
-            case .sheet where course.sheet != nil:
-                Button { process(.regenerateSheet) } label: { Label("Régénérer la fiche", systemImage: "arrow.triangle.2.circlepath") }
-                    .disabled(!canProcess).help("Recrée la fiche à partir du texte nettoyé actuel, y compris tes corrections")
-            case .markdown:
-                if course.sheet != nil { Toggle("Texte nettoyé", isOn: $exportCleanText).toggleStyle(.checkbox).help("Inclure le texte nettoyé sous la fiche") }
-                Toggle("Transcription brute", isOn: $exportTranscript).toggleStyle(.checkbox).help("Inclure la transcription brute dans un bloc repliable")
-                Button(action: copyMarkdown) { Label("Copier", systemImage: "doc.on.doc") }
-                Button(action: export) { Label("Exporter", systemImage: "square.and.arrow.up") }
-            default: EmptyView()
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) { tabPicker.pickerStyle(.segmented); Spacer(minLength: 12); tabTools; chatButton }
+            tabBarStack(tabPicker.pickerStyle(.segmented))
+            tabBarStack(tabPicker.pickerStyle(.menu))
+        }
+    }
+
+    private func tabBarStack(_ picker: some View) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) { picker; Spacer(minLength: 12); chatButton }
+            if hasTabTools { FlowLayout(spacing: 12, lineSpacing: 8) { tabTools } }
+        }
+    }
+
+    private var tabPicker: some View {
+        Picker("Vue", selection: $tab) { ForEach(tabs) { Text($0.rawValue).tag($0) } }
+            .labelsHidden().fixedSize()
+    }
+
+    private var chatButton: some View {
+        Button { showChat.toggle() } label: { Image(systemName: "bubble.left.and.text.bubble.right").symbolVariant(showChat ? .fill : .none) }
+            .buttonStyle(.borderless).help(showChat ? "Fermer les questions" : "Poser une question sur le cours")
+    }
+
+    private var hasTabTools: Bool {
+        switch tab {
+        case .document: return course.hasDocument
+        case .transcript: return !course.sources.isEmpty
+        case .sheet: return course.sheet != nil
+        case .markdown: return true
+        case .archive: return false
+        }
+    }
+
+    @ViewBuilder private var tabTools: some View {
+        switch tab {
+        case .document where course.hasDocument:
+            Picker("Organisation", selection: $layout) { ForEach(DocumentLayout.allCases) { Text($0.label).tag($0) } }
+                .pickerStyle(.menu).labelsHidden().fixedSize().help("Organisation du document et de l’export")
+            Button { showOutline.toggle() } label: { Image(systemName: "sidebar.right") }
+                .buttonStyle(.borderless).help(showOutline ? "Masquer le plan" : "Afficher le plan")
+        case .transcript where !course.sources.isEmpty:
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Filtrer la transcription", text: $transcriptFilter).textFieldStyle(.plain)
+                if !transcriptFilter.isEmpty { Button { transcriptFilter = "" } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.borderless).foregroundStyle(.secondary) }
             }
-            Button { showChat.toggle() } label: { Image(systemName: "bubble.left.and.text.bubble.right").symbolVariant(showChat ? .fill : .none) }
-                .buttonStyle(.borderless).help(showChat ? "Fermer les questions" : "Poser une question sur le cours")
+            .padding(.horizontal, 8).padding(.vertical, 5).frame(width: 240)
+            .background(RoundedRectangle(cornerRadius: 7).fill(.quaternary.opacity(0.5)))
+        case .sheet where course.sheet != nil:
+            Button { process(.regenerateSheet) } label: { Label("Régénérer la fiche", systemImage: "arrow.triangle.2.circlepath") }
+                .disabled(!canProcess).help("Recrée la fiche à partir du texte nettoyé actuel, y compris tes corrections")
+        case .markdown:
+            if course.sheet != nil { Toggle("Texte nettoyé", isOn: $exportCleanText).toggleStyle(.checkbox).help("Inclure le texte nettoyé sous la fiche") }
+            Toggle("Transcription brute", isOn: $exportTranscript).toggleStyle(.checkbox).help("Inclure la transcription brute dans un bloc repliable")
+            Button(action: copyMarkdown) { Label("Copier", systemImage: "doc.on.doc") }
+            Button(action: export) { Label("Exporter", systemImage: "square.and.arrow.up") }
+        default: EmptyView()
         }
     }
 

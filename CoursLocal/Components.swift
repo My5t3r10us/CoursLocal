@@ -154,7 +154,35 @@ struct ThemeChip: View {
 struct MetaLabel: View {
     let symbol: String
     let text: String
-    var body: some View { Label(text, systemImage: symbol).font(.callout).foregroundStyle(.secondary).labelStyle(.titleAndIcon) }
+    var body: some View { Label(text, systemImage: symbol).font(.callout).foregroundStyle(.secondary).labelStyle(.titleAndIcon).lineLimit(1) }
+}
+
+/// Places items left to right and wraps to a new line when the width runs out.
+/// Its ideal width is the widest item, so it never forces its container (or a ViewThatFits) wider.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 12
+    var lineSpacing: CGFloat = 8
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+        let frames = frames(subviews, width: width)
+        return CGSize(width: frames.map(\.maxX).max() ?? 0, height: frames.map(\.maxY).max() ?? 0)
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (subview, frame) in zip(subviews, frames(subviews, width: bounds.width)) {
+            subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
+        }
+    }
+    private func frames(_ subviews: Subviews, width: CGFloat) -> [CGRect] {
+        var frames: [CGRect] = []; var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0
+        for subview in subviews {
+            var size = subview.sizeThatFits(.unspecified)
+            if size.width > width { size = subview.sizeThatFits(ProposedViewSize(width: width, height: nil)) }
+            if x > 0 && x + size.width > width { x = 0; y += lineHeight + lineSpacing; lineHeight = 0 }
+            frames.append(CGRect(x: x, y: y, width: size.width, height: size.height))
+            x += size.width + spacing; lineHeight = max(lineHeight, size.height)
+        }
+        return frames
+    }
 }
 
 struct NoticeView<Actions: View>: View {
