@@ -54,6 +54,8 @@ struct ContentView: View {
     @ObservedObject var pipeline: Pipeline
     @ObservedObject var player: CourseAudioPlayer
     @ObservedObject var gate: OperationGate
+    @ObservedObject var phoneReceiver: PhoneReceiver
+    @ObservedObject var remote: PhoneRemote
     @StateObject private var server = ServerMonitor()
     @StateObject private var assistant: CourseAssistant
     @AppStorage("rapidMLXModel") private var model = ""
@@ -64,9 +66,10 @@ struct ContentView: View {
     @State private var selection: UUID?
     @State private var search = ""
     @State private var newCourse = false
+    @State private var phoneStart = false
     @State private var pendingDelete: Course?
-    init(store: CourseStore, recorder: AudioRecorder, pipeline: Pipeline, player: CourseAudioPlayer) {
-        self.store = store; self.recorder = recorder; self.pipeline = pipeline; self.player = player; gate = store.gate
+    init(store: CourseStore, recorder: AudioRecorder, pipeline: Pipeline, player: CourseAudioPlayer, phoneReceiver: PhoneReceiver) {
+        self.store = store; self.recorder = recorder; self.pipeline = pipeline; self.player = player; gate = store.gate; self.phoneReceiver = phoneReceiver; remote = phoneReceiver.remote
         _assistant = StateObject(wrappedValue: CourseAssistant(store: store))
     }
     private var filtered: [Course] {
@@ -97,8 +100,12 @@ struct ContentView: View {
                     VStack(spacing: 0) {
                         if recorder.courseID != nil { RecordingBanner(store: store, recorder: recorder) }
                         if pipeline.busy { ProcessingBanner(store: store, pipeline: pipeline, selection: selection) }
+                        PhoneRecordingBanner(remote: remote)
+                        if let activity = phoneReceiver.activity { PhoneTransferBanner(activity: activity) }
                     }
                 }
+                .animation(.smooth(duration: 0.25), value: phoneReceiver.activity == nil)
+                .animation(.smooth(duration: 0.25), value: remote.recording)
                 .animation(.smooth(duration: 0.25), value: pipeline.busy)
                 .animation(.smooth(duration: 0.25), value: recorder.courseID)
         }
@@ -108,8 +115,13 @@ struct ContentView: View {
                     .help("Enregistrer un nouveau cours").disabled(gate.busy || !store.ready)
                 Button(action: importAudio) { Label("Importer", systemImage: "square.and.arrow.down") }
                     .help("Importer un fichier audio").disabled(gate.busy || !store.ready)
+                if remote.connected {
+                    Button { phoneStart = true } label: { Label("Enregistrer sur l’iPhone", systemImage: "iphone.gen3.radiowaves.left.and.right") }
+                        .help("Démarrer l’enregistrement sur \(remote.device ?? "l’iPhone")").disabled(remote.recording)
+                }
             }
         }
+        .sheet(isPresented: $phoneStart) { PhoneStartSheet(remote: remote) }
         .sheet(isPresented: $newCourse) {
             NewCourseSheet { title, mode, pid in
                 player.stop()
@@ -161,7 +173,12 @@ struct ContentView: View {
                 } else { ContentUnavailableView.search(text: search) }
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { serverFooter }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                PhoneRemoteCard(remote: remote) { phoneStart = true }
+                serverFooter
+            }
+        }
         .navigationSplitViewColumnWidth(min: 250, ideal: 290, max: 420)
     }
 
@@ -311,6 +328,26 @@ struct ProcessingBanner: View {
             if pipeline.total > 0 {
                 ProgressView(value: Double(pipeline.completed), total: Double(pipeline.total)).progressViewStyle(.linear)
             }
+        }
+        .padding(.horizontal, 20).padding(.vertical, 12)
+        .background(Color.accentColor.opacity(0.06))
+        .background(.bar)
+        .overlay(alignment: .bottom) { Divider() }
+    }
+}
+
+struct PhoneTransferBanner: View {
+    let activity: PhoneReceiver.Activity
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "iphone.and.arrow.forward").foregroundStyle(.tint)
+                Text("Réception depuis l’iPhone").font(.headline)
+                Text("· \(activity.title)").foregroundStyle(.secondary).lineLimit(1)
+                Spacer()
+                Text(activity.fraction.formatted(.percent.precision(.fractionLength(0)))).monospacedDigit().foregroundStyle(.secondary)
+            }
+            ProgressView(value: activity.fraction).progressViewStyle(.linear)
         }
         .padding(.horizontal, 20).padding(.vertical, 12)
         .background(Color.accentColor.opacity(0.06))

@@ -8,6 +8,7 @@ struct PreferencesView: View {
             TranscriptionSettings().tabItem { Label("Transcription", systemImage: "waveform") }
             AISettingsView().tabItem { Label("IA", systemImage: "cpu") }
             ObsidianSettings().tabItem { Label("Obsidian", systemImage: "doc.richtext") }
+            PhoneSettings().tabItem { Label("iPhone", systemImage: "iphone") }
             GeneralSettings().tabItem { Label("Général", systemImage: "gearshape") }
         }
         .frame(width: 640, height: 560)
@@ -336,5 +337,53 @@ private struct GeneralSettings: View {
                 else { Label("Mode cloud : le texte des transcriptions est envoyé à OpenRouter pour le nettoyage.", systemImage: "icloud.and.arrow.up") }
             }
         }.formStyle(.grouped)
+    }
+}
+
+private struct PhoneSettings: View {
+    @EnvironmentObject private var receiver: PhoneReceiver
+    @AppStorage(PhoneReceiver.enabledKey) private var enabled = true
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Recevoir les enregistrements de l’iPhone", isOn: $enabled)
+                LabeledContent("État") {
+                    switch receiver.status {
+                    case .off: Text("Désactivé").foregroundStyle(.secondary)
+                    case .starting: Text("Démarrage…").foregroundStyle(.secondary)
+                    case .listening: Label("Visible par l’iPhone", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    case .failed(let message): Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    }
+                }
+                LabeledContent("Télécommande") { PhoneRemoteStatus(remote: receiver.remote) }
+                if let event = receiver.lastEvent { LabeledContent("Dernière réception", value: event) }
+            } footer: {
+                Text("L’app CoursLocal de l’iPhone trouve ce Mac sur le même Wi-Fi, ou directement à proximité comme AirDrop. CoursLocal doit être ouvert sur le Mac pendant l’envoi. Chaque enregistrement reçu devient un cours, traité automatiquement si l’option est activée dans Général. Quand l’app iPhone est ouverte (ou en veille joignable), tu peux démarrer, mettre en pause et terminer l’enregistrement de l’iPhone depuis ce Mac.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                LabeledContent("Code d’appairage") {
+                    Text(receiver.code.prefix(3) + " " + receiver.code.suffix(3))
+                        .font(.system(.title, design: .monospaced).weight(.semibold)).textSelection(.enabled)
+                }
+                Button("Générer un nouveau code") { receiver.regenerateCode() }
+            } footer: {
+                Text("Saisis ce code une seule fois dans l’app iPhone. Seuls les appareils qui le connaissent peuvent envoyer de l’audio à ce Mac. Un nouveau code oblige l’iPhone à le saisir de nouveau.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .onChange(of: enabled) { _, on in receiver.setEnabled(on) }
+    }
+}
+
+private struct PhoneRemoteStatus: View {
+    @ObservedObject var remote: PhoneRemote
+    var body: some View {
+        if remote.connected, let device = remote.device {
+            Label("\(device) connecté", systemImage: "iphone.gen3").foregroundStyle(.green)
+        } else {
+            Text("Aucun iPhone connecté — ouvre CoursLocal sur l’iPhone").foregroundStyle(.secondary)
+        }
     }
 }

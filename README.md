@@ -47,6 +47,45 @@ Les files audio sont bornées. Une surcharge, une erreur disque, un changement d
 
 Le bouton **Importer** accepte les formats reconnus par AVFoundation et les convertit en segments M4A de cinq minutes. L’import est annulable. Un import incomplet reste signalé et ne peut pas être traité ; **Réimporter le fichier original** crée un nouvel import complet sans effacer le précédent.
 
+## App iPhone : enregistrer, puis envoyer au Mac
+
+L’app **CoursLocal** pour iPhone (cible `CoursLocalMobile`, iOS 17 ou ultérieur) ne fait qu’une chose : enregistrer le cours avec le micro de l’iPhone, puis envoyer l’audio au Mac, qui fait la transcription, le nettoyage et la fiche comme pour un enregistrement fait sur le Mac.
+
+### Installation sur l’iPhone
+
+1. Branche l’iPhone au Mac, ouvre `CoursLocal.xcodeproj` et choisis le schéma **CoursLocalMobile** puis ton iPhone comme destination.
+2. Dans la cible **CoursLocalMobile → Signing & Capabilities**, choisis ton équipe : un **identifiant Apple gratuit** (Personal Team) suffit. Si l’identifiant `fr.baptiste.CoursLocal.mobile` est refusé, remplace-le par un autre identifiant unique.
+3. Lance avec **⌘R**. Au premier lancement, active le **mode développeur** sur l’iPhone (Réglages → Confidentialité et sécurité) et fais confiance au profil (Réglages → Général → VPN et gestion de l’appareil). Avec un compte gratuit, l’app doit être réinstallée depuis Xcode tous les 7 jours ; les enregistrements sont conservés.
+
+### Appairage
+
+Dans **CoursLocal → Réglages… → iPhone** sur le Mac, laisse **Recevoir les enregistrements de l’iPhone** activé et note le **code d’appairage** à 6 chiffres. Dans l’app iPhone, touche ⚙︎ et saisis ce code, une seule fois. Accepte les demandes d’accès au **réseau local** sur les deux appareils (et les connexions entrantes si le pare-feu macOS le demande). **Générer un nouveau code** sur le Mac révoque l’ancien : l’iPhone redemandera le code.
+
+### Utilisation
+
+- Saisis un titre si tu veux (sinon « Cours du … ») et touche le bouton rouge. Tu peux **verrouiller l’écran** : l’enregistrement continue en arrière-plan. **Pause** n’enregistre plus rien et le temps de pause est retiré ; le micro reste ouvert pour que la reprise fonctionne aussi depuis le Mac, écran verrouillé. Un appel met l’enregistrement en pause et il reprend tout seul ensuite. Le micro intégré est toujours utilisé, même avec des AirPods connectés.
+- **Terminer** (avec confirmation) clôt l’enregistrement. Dès que le Mac est visible, app ouverte des deux côtés, l’envoi part automatiquement (désactivable). L’iPhone et le Mac se trouvent sur le même Wi-Fi ou **directement à proximité, en pair-à-pair comme AirDrop**, ce qui marche aussi quand le Wi-Fi de l’établissement isole les appareils.
+- Sur le Mac, un bandeau montre la réception. Chaque enregistrement reçu devient un cours daté du moment de l’enregistrement, puis est traité automatiquement si **Traiter automatiquement** est activé. Si le Mac est occupé (enregistrement, traitement…), l’enregistrement reçu attend sur le disque et devient un cours dès que le Mac est libre.
+- Sur l’iPhone, chaque enregistrement est marqué **À envoyer** ou **Sur le Mac** ; appui long pour envoyer à nouveau, renommer ou supprimer. L’option **Supprimer de l’iPhone après l’envoi** libère la place automatiquement.
+
+### Contrôle depuis le Mac
+
+Dès que l’app iPhone est appairée et ouverte, elle garde une connexion de contrôle avec le Mac (même code d’appairage) :
+
+- Sur le Mac, une carte en bas de la barre latérale montre l’iPhone connecté et son état (prêt, nombre d’enregistrements à envoyer, envoi en cours). Le bouton ● de la carte, ou **Enregistrer sur l’iPhone** dans la barre d’outils, demande un titre facultatif puis démarre l’enregistrement sur l’iPhone.
+- Pendant un enregistrement iPhone, un bandeau rouge affiche en temps réel la durée, le niveau du micro et les messages de l’iPhone (interruption par un appel…), avec **Pause**, **Reprendre** et **Terminer** (confirmation). À la fin, l’iPhone envoie l’audio au Mac, qui le traite comme d’habitude.
+- L’iPhone envoie son état environ cinq fois par seconde pendant un enregistrement, sinon toutes les deux secondes ; le Mac le relance toutes les trois secondes. Si la connexion est perdue pendant un enregistrement (iPhone hors de portée), le bandeau le signale et garde la dernière durée connue : **l’enregistrement continue sur l’iPhone**, et le contrôle revient dès que l’iPhone se reconnecte.
+- Une commande impossible sur l’iPhone (micro refusé…) s’affiche en alerte sur le Mac.
+
+**Limite d’iOS** : une app en arrière-plan ne peut pas ouvrir le micro, et une app inactive est suspendue. Le Mac peut donc toujours contrôler un enregistrement en cours, même écran verrouillé, mais pour **démarrer** un enregistrement l’app iPhone doit être ouverte, sauf si l’option **Rester joignable en arrière-plan** est activée (Réglages de l’app iPhone). Avec cette option, le micro reste ouvert sans rien enregistrer (point orange visible, un peu de batterie) pour que l’app reste active et joignable. L’option doit être activée app ouverte.
+
+### Fiabilité
+
+- L’audio est écrit en **WAV mono 16 kHz 16 bits, un fichier par tranche de cinq minutes**, exactement comme sur le Mac (environ 115 Mo par heure). Si l’app est tuée ou la batterie se vide, l’enregistrement est récupéré au lancement suivant : l’en-tête du dernier segment est réparé et rien de ce qui a été écrit n’est perdu.
+- Le Mac ne confirme l’envoi qu’après avoir **écrit, synchronisé et relu** chaque segment avec AVFoundation ; un segment illisible fait refuser l’envoi, qui reste à faire sur l’iPhone. Un enregistrement renvoyé après une confirmation perdue est reconnu et n’est pas importé deux fois.
+- Le Mac n’accepte qu’un iPhone à la fois, refuse les codes incorrects (avec délai, puis une minute de blocage après cinq erreurs), limite la taille et le nombre de segments et n’écrit que des noms de fichiers qu’il choisit. Le transfert reste sur le réseau local, sans chiffrement propre : n’utilise pas l’appairage sur un réseau auquel tu ne fais pas confiance.
+- Les fichiers WAV sont aussi visibles dans l’app **Fichiers** et dans le **Finder** (iPhone branché), en dernier recours.
+
 ## Questions sur un cours
 
 Le bouton bulle, à droite des onglets d’un cours, ouvre le panneau **Questions** dès que le texte est transcrit. L’IA configurée (Rapid MLX ou OpenRouter) répond d’abord à partir du cours et cite les moments `[hh:mm:ss]`, cliquables pour réécouter le passage. Si le cours ne suffit pas, elle le dit et peut compléter dans un paragraphe « Hors cours : ».
@@ -111,6 +150,12 @@ xcodebuild -project CoursLocal.xcodeproj -scheme CoursLocal -destination 'platfo
 xcodebuild -project CoursLocal.xcodeproj -scheme CoursLocal -destination 'platform=macOS' -configuration Release build
 ```
 
+Pour vérifier que l’app iPhone compile sans signer :
+
+```sh
+xcodebuild -project CoursLocal.xcodeproj -scheme CoursLocalMobile -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+```
+
 La configuration fixe l’architecture à arm64. Les tests utilisent des bibliothèques temporaires et des transcriptions simulées ; ils ne téléchargent aucun modèle et ne capturent pas le microphone réel.
 
 Pour inclure le test du transport HTTP réel avec URLSession, démarre dans un autre terminal le serveur **de test uniquement** :
@@ -136,7 +181,9 @@ La suite couvre notamment :
 - mixage des sources et exclusion du temps passé en pause ;
 - migration avec sauvegarde, récupération du manifeste, conservation des fichiers illisibles ;
 - correction sans perte des éditions et reprise après échec de l’harmonisation des thèmes ;
-- rendu de l’interface avec un cours de démonstration.
+- rendu de l’interface avec un cours de démonstration ;
+- transfert iPhone → Mac réel en boucle locale : création du cours, durées relues, renvoi sans doublon, code incorrect, audio illisible refusé sans rien garder, attente quand le Mac est occupé, réparation d’un WAV interrompu ;
+- canal de contrôle : état en direct, relais des commandes, erreur de l’iPhone signalée une seule fois, envoi d’un enregistrement pendant le contrôle, perte de connexion pendant un enregistrement, code d’appairage exigé.
 
 ### Validation réelle restant à effectuer
 
@@ -147,6 +194,7 @@ Ces tests automatisés ne remplacent pas les essais suivants :
 3. Réaliser une capture réelle de deux heures ; contrôler les frontières audio, la dérive entre sources, la mémoire et le temps de traitement.
 4. Interrompre puis relancer le parcours, vérifier le lecteur, les corrections et l’export après redémarrage ; ouvrir la note exportée dans Obsidian (propriétés, sommaire, encadrés).
 5. Après téléchargement des modèles, répéter le parcours hors ligne.
+6. Sur un iPhone réel : enregistrer écran verrouillé pendant au moins 15 minutes, recevoir un appel pendant l’enregistrement, débrancher/brancher un casque, forcer la fermeture de l’app pendant un enregistrement puis la rouvrir ; envoyer au Mac en Wi-Fi puis Wi-Fi coupé (pair-à-pair). Depuis le Mac : démarrer avec l’app iPhone ouverte, puis iPhone verrouillé avec « Rester joignable » ; mettre en pause, reprendre et terminer écran verrouillé ; éloigner l’iPhone pendant un enregistrement puis le rapprocher.
 
 ## Structure
 
@@ -157,6 +205,10 @@ Ces tests automatisés ne remplacent pas les essais suivants :
 - `ObsidianExport.swift` : génération du Markdown Obsidian et export vers le coffre.
 - `CourseStore.swift` : bibliothèque observable, dépôt de fichiers sérialisé, éditions du document.
 - `Models.swift` : cours versionnés, sources, anciens résultats, états et découpage.
+- `PhoneReceiver.swift` : réception des enregistrements de l’iPhone (Bonjour, boîte de réception durable, création des cours).
+- `Shared/PhoneTransfer.swift` : protocole de transfert iPhone → Mac et réparation des WAV interrompus, compilé dans les deux apps.
+- `PhoneRemoteViews.swift` : bandeau d’enregistrement iPhone en direct, carte de l’iPhone connecté, démarrage à distance.
+- `CoursLocalMobile/` : app iPhone (enregistreur segmenté avec veille joignable, bibliothèque locale, recherche du Mac et envoi, connexion de contrôle `MacRemote.swift`, interface).
 - `RecordingShortcut.swift` : raccourci global, pastille flottante d’enregistrement et capture du raccourci dans les réglages.
 - `CourseChat.swift` : panneau Questions, choix des extraits envoyés et invite « cours d’abord ».
 - `ContentView.swift` : fenêtre principale, bibliothèque, bandeaux, accueil, nouveau cours.

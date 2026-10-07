@@ -1,72 +1,588 @@
 // !$*UTF8*$!
 {
- archiveVersion = 1;
- classes = {};
- objectVersion = 56;
- objects = {
-  000000000000000000000016 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioRecorder.swift"; sourceTree = "<group>"; };
-  000000000000000000000017 = { isa = PBXBuildFile; fileRef = 000000000000000000000016; };
-  000000000000000000000018 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView.swift"; sourceTree = "<group>"; };
-  000000000000000000000019 = { isa = PBXBuildFile; fileRef = 000000000000000000000018; };
-  00000000000000000000001A = { isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "CoursLocal.entitlements"; sourceTree = "<group>"; };
-  00000000000000000000001B = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CoursLocalApp.swift"; sourceTree = "<group>"; };
-  00000000000000000000001C = { isa = PBXBuildFile; fileRef = 00000000000000000000001B; };
-  00000000000000000000001D = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CourseStore.swift"; sourceTree = "<group>"; };
-  00000000000000000000001E = { isa = PBXBuildFile; fileRef = 00000000000000000000001D; };
-  00000000000000000000001F = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
-  000000000000000000000020 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalAI.swift"; sourceTree = "<group>"; };
-  000000000000000000000021 = { isa = PBXBuildFile; fileRef = 000000000000000000000020; };
-  000000000000000000000022 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models.swift"; sourceTree = "<group>"; };
-  000000000000000000000023 = { isa = PBXBuildFile; fileRef = 000000000000000000000022; };
-  000000000000000000000024 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Pipeline.swift"; sourceTree = "<group>"; };
-  000000000000000000000025 = { isa = PBXBuildFile; fileRef = 000000000000000000000024; };
-  000000000000000000000026 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TextChunksTests.swift"; sourceTree = "<group>"; };
-  000000000000000000000027 = { isa = PBXBuildFile; fileRef = 000000000000000000000026; };
-  000000000000000000000030 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CleanDocument.swift"; sourceTree = "<group>"; };
-  000000000000000000000031 = { isa = PBXBuildFile; fileRef = 000000000000000000000030; };
-  000000000000000000000032 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ObsidianExport.swift"; sourceTree = "<group>"; };
-  000000000000000000000033 = { isa = PBXBuildFile; fileRef = 000000000000000000000032; };
-  000000000000000000000034 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Components.swift"; sourceTree = "<group>"; };
-  000000000000000000000035 = { isa = PBXBuildFile; fileRef = 000000000000000000000034; };
-  000000000000000000000036 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CourseDetailView.swift"; sourceTree = "<group>"; };
-  000000000000000000000037 = { isa = PBXBuildFile; fileRef = 000000000000000000000036; };
-  000000000000000000000038 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView.swift"; sourceTree = "<group>"; };
-  000000000000000000000039 = { isa = PBXBuildFile; fileRef = 000000000000000000000038; };
-  00000000000000000000003A = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CourseSheet.swift"; sourceTree = "<group>"; };
-  00000000000000000000003B = { isa = PBXBuildFile; fileRef = 00000000000000000000003A; };
-  00000000000000000000003C = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecordingShortcut.swift"; sourceTree = "<group>"; };
-  00000000000000000000003D = { isa = PBXBuildFile; fileRef = 00000000000000000000003C; };
-  00000000000000000000003E = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CourseChat.swift"; sourceTree = "<group>"; };
-  00000000000000000000003F = { isa = PBXBuildFile; fileRef = 00000000000000000000003E; };
-  000000000000000000000002 = { isa = PBXGroup; children = (000000000000000000000003,000000000000000000000004,000000000000000000000005,); sourceTree = "<group>"; };
-  000000000000000000000003 = { isa = PBXGroup; children = (000000000000000000000016,000000000000000000000018,00000000000000000000001A,00000000000000000000001B,00000000000000000000001D,00000000000000000000001F,000000000000000000000020,000000000000000000000022,000000000000000000000024,000000000000000000000030,000000000000000000000032,000000000000000000000034,000000000000000000000036,000000000000000000000038,00000000000000000000003A,00000000000000000000003C,00000000000000000000003E,); path = CoursLocal; sourceTree = "<group>"; };
-  000000000000000000000004 = { isa = PBXGroup; children = (000000000000000000000026,); path = CoursLocalTests; sourceTree = "<group>"; };
-  000000000000000000000005 = { isa = PBXGroup; children = (000000000000000000000008,000000000000000000000009,); name = Products; sourceTree = "<group>"; };
-  000000000000000000000008 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = CoursLocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
-  000000000000000000000009 = { isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = CoursLocalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-  000000000000000000000013 = { isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/argmaxinc/argmax-oss-swift.git"; requirement = { kind = exactVersion; version = 1.1.0; }; };
-  000000000000000000000014 = { isa = XCSwiftPackageProductDependency; package = 000000000000000000000013; productName = WhisperKit; };
-  000000000000000000000015 = { isa = PBXBuildFile; productRef = 000000000000000000000014; };
-  00000000000000000000000A = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000017,000000000000000000000019,00000000000000000000001C,00000000000000000000001E,000000000000000000000021,000000000000000000000023,000000000000000000000025,000000000000000000000031,000000000000000000000033,000000000000000000000035,000000000000000000000037,000000000000000000000039,00000000000000000000003B,00000000000000000000003D,00000000000000000000003F,); runOnlyForDeploymentPostprocessing = 0; };
-  00000000000000000000000B = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000015,); runOnlyForDeploymentPostprocessing = 0; };
-  00000000000000000000000C = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-  00000000000000000000000D = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000027,); runOnlyForDeploymentPostprocessing = 0; };
-  00000000000000000000000E = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-  00000000000000000000000F = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-  000000000000000000000028 = { isa = PBXContainerItemProxy; containerPortal = 000000000000000000000001; proxyType = 1; remoteGlobalIDString = 000000000000000000000006; remoteInfo = CoursLocal; };
-  000000000000000000000029 = { isa = PBXTargetDependency; target = 000000000000000000000006; targetProxy = 000000000000000000000028; };
-  000000000000000000000006 = { isa = PBXNativeTarget; buildConfigurationList = 000000000000000000000011; buildPhases = (00000000000000000000000A,00000000000000000000000B,00000000000000000000000C,); buildRules = (); dependencies = (); name = CoursLocal; packageProductDependencies = (000000000000000000000014,); productName = CoursLocal; productReference = 000000000000000000000008; productType = "com.apple.product-type.application"; };
-  000000000000000000000007 = { isa = PBXNativeTarget; buildConfigurationList = 000000000000000000000012; buildPhases = (00000000000000000000000D,00000000000000000000000E,00000000000000000000000F,); buildRules = (); dependencies = (000000000000000000000029,); name = CoursLocalTests; productName = CoursLocalTests; productReference = 000000000000000000000009; productType = "com.apple.product-type.bundle.unit-test"; };
-  00000000000000000000002A = { isa = XCBuildConfiguration; buildSettings = { SDKROOT = "macosx"; ARCHS = arm64; ONLY_ACTIVE_ARCH = YES; MACOSX_DEPLOYMENT_TARGET = "14.0"; SWIFT_VERSION = "5.0"; CLANG_ENABLE_MODULES = "YES"; CLANG_ENABLE_OBJC_ARC = "YES"; SWIFT_STRICT_CONCURRENCY = "minimal"; ENABLE_USER_SCRIPT_SANDBOXING = "YES"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = "dwarf"; ENABLE_TESTABILITY = "YES"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)"; }; name = Debug; };
-  00000000000000000000002B = { isa = XCBuildConfiguration; buildSettings = { SDKROOT = "macosx"; ARCHS = arm64; ONLY_ACTIVE_ARCH = YES; MACOSX_DEPLOYMENT_TARGET = "14.0"; SWIFT_VERSION = "5.0"; CLANG_ENABLE_MODULES = "YES"; CLANG_ENABLE_OBJC_ARC = "YES"; SWIFT_STRICT_CONCURRENCY = "minimal"; ENABLE_USER_SCRIPT_SANDBOXING = "YES"; SWIFT_OPTIMIZATION_LEVEL = "-O"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; ENABLE_TESTABILITY = "NO"; }; name = Release; };
-  000000000000000000000010 = { isa = XCConfigurationList; buildConfigurations = (00000000000000000000002A,00000000000000000000002B,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-  00000000000000000000002C = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_BUNDLE_IDENTIFIER = "fr.baptiste.CoursLocal"; PRODUCT_NAME = "$(TARGET_NAME)"; INFOPLIST_FILE = "CoursLocal/Info.plist"; CODE_SIGN_ENTITLEMENTS = "CoursLocal/CoursLocal.entitlements"; CODE_SIGN_STYLE = "Manual"; CODE_SIGN_IDENTITY = "-"; ENABLE_HARDENED_RUNTIME = "YES"; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)","@executable_path/../Frameworks",); COMBINE_HIDPI_IMAGES = "YES"; }; name = Debug; };
-  00000000000000000000002D = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_BUNDLE_IDENTIFIER = "fr.baptiste.CoursLocal"; PRODUCT_NAME = "$(TARGET_NAME)"; INFOPLIST_FILE = "CoursLocal/Info.plist"; CODE_SIGN_ENTITLEMENTS = "CoursLocal/CoursLocal.entitlements"; CODE_SIGN_STYLE = "Manual"; CODE_SIGN_IDENTITY = "-"; ENABLE_HARDENED_RUNTIME = "YES"; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)","@executable_path/../Frameworks",); COMBINE_HIDPI_IMAGES = "YES"; }; name = Release; };
-  000000000000000000000011 = { isa = XCConfigurationList; buildConfigurations = (00000000000000000000002C,00000000000000000000002D,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-  00000000000000000000002E = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_BUNDLE_IDENTIFIER = "fr.baptiste.CoursLocalTests"; PRODUCT_NAME = "$(TARGET_NAME)"; GENERATE_INFOPLIST_FILE = "YES"; CODE_SIGN_STYLE = "Manual"; CODE_SIGN_IDENTITY = "-"; BUNDLE_LOADER = "$(TEST_HOST)"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoursLocal.app/Contents/MacOS/CoursLocal"; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)","@executable_path/../Frameworks","@loader_path/../Frameworks",); }; name = Debug; };
-  00000000000000000000002F = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_BUNDLE_IDENTIFIER = "fr.baptiste.CoursLocalTests"; PRODUCT_NAME = "$(TARGET_NAME)"; GENERATE_INFOPLIST_FILE = "YES"; CODE_SIGN_STYLE = "Manual"; CODE_SIGN_IDENTITY = "-"; BUNDLE_LOADER = "$(TEST_HOST)"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoursLocal.app/Contents/MacOS/CoursLocal"; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)","@executable_path/../Frameworks","@loader_path/../Frameworks",); }; name = Release; };
-  000000000000000000000012 = { isa = XCConfigurationList; buildConfigurations = (00000000000000000000002E,00000000000000000000002F,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-  000000000000000000000001 = { isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 1600; TargetAttributes = { 000000000000000000000006 = { CreatedOnToolsVersion = 16.0; }; 000000000000000000000007 = { CreatedOnToolsVersion = 16.0; TestTargetID = 000000000000000000000006; }; }; }; buildConfigurationList = 000000000000000000000010; compatibilityVersion = "Xcode 14.0"; developmentRegion = fr; hasScannedForEncodings = 0; knownRegions = (fr,en,Base,); mainGroup = 000000000000000000000002; packageReferences = (000000000000000000000013,); productRefGroup = 000000000000000000000005; projectDirPath = ""; projectRoot = ""; targets = (000000000000000000000006,000000000000000000000007,); };
- };
- rootObject = 000000000000000000000001;
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		000000000000000000000015 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000014 /* WhisperKit */; };
+		000000000000000000000017 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000016 /* AudioRecorder.swift */; };
+		000000000000000000000019 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000018 /* ContentView.swift */; };
+		00000000000000000000001C /* CoursLocalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000001B /* CoursLocalApp.swift */; };
+		00000000000000000000001E /* CourseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000001D /* CourseStore.swift */; };
+		000000000000000000000021 /* LocalAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000020 /* LocalAI.swift */; };
+		000000000000000000000023 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000022 /* Models.swift */; };
+		000000000000000000000025 /* Pipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000024 /* Pipeline.swift */; };
+		000000000000000000000027 /* TextChunksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000026 /* TextChunksTests.swift */; };
+		000000000000000000000031 /* CleanDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000030 /* CleanDocument.swift */; };
+		000000000000000000000033 /* ObsidianExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000032 /* ObsidianExport.swift */; };
+		000000000000000000000035 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000034 /* Components.swift */; };
+		000000000000000000000037 /* CourseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000036 /* CourseDetailView.swift */; };
+		000000000000000000000039 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000038 /* SettingsView.swift */; };
+		00000000000000000000003B /* CourseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000003A /* CourseSheet.swift */; };
+		00000000000000000000003D /* RecordingShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000003C /* RecordingShortcut.swift */; };
+		00000000000000000000003F /* CourseChat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000003E /* CourseChat.swift */; };
+		000000000000000000000101 /* PhoneTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000100 /* PhoneTransfer.swift */; };
+		000000000000000000000102 /* PhoneTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000100 /* PhoneTransfer.swift */; };
+		000000000000000000000104 /* PhoneReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000103 /* PhoneReceiver.swift */; };
+		00000000000000000000011D /* PhoneRemoteViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000011C /* PhoneRemoteViews.swift */; };
+		000000000000000000000106 /* CoursLocalMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000105 /* CoursLocalMobileApp.swift */; };
+		000000000000000000000108 /* MobileRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000107 /* MobileRecorder.swift */; };
+		00000000000000000000010A /* MacLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000109 /* MacLink.swift */; };
+		00000000000000000000010C /* MobileViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000010B /* MobileViews.swift */; };
+		00000000000000000000011F /* MacRemote.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000011E /* MacRemote.swift */; };
+		00000000000000000000011B /* PhoneTransferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000011A /* PhoneTransferTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		000000000000000000000028 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000000000006;
+			remoteInfo = CoursLocal;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		000000000000000000000008 /* CoursLocal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = CoursLocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000009 /* CoursLocalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = CoursLocalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000016 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
+		000000000000000000000018 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		00000000000000000000001A /* CoursLocal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CoursLocal.entitlements; sourceTree = "<group>"; };
+		00000000000000000000001B /* CoursLocalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoursLocalApp.swift; sourceTree = "<group>"; };
+		00000000000000000000001D /* CourseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseStore.swift; sourceTree = "<group>"; };
+		00000000000000000000001F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		000000000000000000000020 /* LocalAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAI.swift; sourceTree = "<group>"; };
+		000000000000000000000022 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		000000000000000000000024 /* Pipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pipeline.swift; sourceTree = "<group>"; };
+		000000000000000000000026 /* TextChunksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextChunksTests.swift; sourceTree = "<group>"; };
+		000000000000000000000030 /* CleanDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanDocument.swift; sourceTree = "<group>"; };
+		000000000000000000000032 /* ObsidianExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObsidianExport.swift; sourceTree = "<group>"; };
+		000000000000000000000034 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		000000000000000000000036 /* CourseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseDetailView.swift; sourceTree = "<group>"; };
+		000000000000000000000038 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		00000000000000000000003A /* CourseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseSheet.swift; sourceTree = "<group>"; };
+		00000000000000000000003C /* RecordingShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingShortcut.swift; sourceTree = "<group>"; };
+		00000000000000000000003E /* CourseChat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseChat.swift; sourceTree = "<group>"; };
+		000000000000000000000100 /* PhoneTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneTransfer.swift; sourceTree = "<group>"; };
+		000000000000000000000103 /* PhoneReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneReceiver.swift; sourceTree = "<group>"; };
+		00000000000000000000011C /* PhoneRemoteViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneRemoteViews.swift; sourceTree = "<group>"; };
+		000000000000000000000105 /* CoursLocalMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoursLocalMobileApp.swift; sourceTree = "<group>"; };
+		000000000000000000000107 /* MobileRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileRecorder.swift; sourceTree = "<group>"; };
+		000000000000000000000109 /* MacLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLink.swift; sourceTree = "<group>"; };
+		00000000000000000000010B /* MobileViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileViews.swift; sourceTree = "<group>"; };
+		00000000000000000000011E /* MacRemote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRemote.swift; sourceTree = "<group>"; };
+		00000000000000000000010D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		000000000000000000000112 /* CoursLocalMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = CoursLocalMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		00000000000000000000011A /* PhoneTransferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneTransferTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		00000000000000000000000B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000015 /* WhisperKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		00000000000000000000000E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		000000000000000000000114 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000003 /* CoursLocal */,
+				000000000000000000000111 /* CoursLocalMobile */,
+				000000000000000000000110 /* Shared */,
+				000000000000000000000004 /* CoursLocalTests */,
+				000000000000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000003 /* CoursLocal */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000016 /* AudioRecorder.swift */,
+				000000000000000000000018 /* ContentView.swift */,
+				00000000000000000000001A /* CoursLocal.entitlements */,
+				00000000000000000000001B /* CoursLocalApp.swift */,
+				00000000000000000000001D /* CourseStore.swift */,
+				00000000000000000000001F /* Info.plist */,
+				000000000000000000000020 /* LocalAI.swift */,
+				000000000000000000000022 /* Models.swift */,
+				000000000000000000000024 /* Pipeline.swift */,
+				000000000000000000000030 /* CleanDocument.swift */,
+				000000000000000000000032 /* ObsidianExport.swift */,
+				000000000000000000000034 /* Components.swift */,
+				000000000000000000000036 /* CourseDetailView.swift */,
+				000000000000000000000038 /* SettingsView.swift */,
+				00000000000000000000003A /* CourseSheet.swift */,
+				00000000000000000000003C /* RecordingShortcut.swift */,
+				00000000000000000000003E /* CourseChat.swift */,
+				000000000000000000000103 /* PhoneReceiver.swift */,
+				00000000000000000000011C /* PhoneRemoteViews.swift */,
+			);
+			path = CoursLocal;
+			sourceTree = "<group>";
+		};
+		000000000000000000000004 /* CoursLocalTests */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000026 /* TextChunksTests.swift */,
+				00000000000000000000011A /* PhoneTransferTests.swift */,
+			);
+			path = CoursLocalTests;
+			sourceTree = "<group>";
+		};
+		000000000000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000008 /* CoursLocal.app */,
+				000000000000000000000009 /* CoursLocalTests.xctest */,
+				000000000000000000000112 /* CoursLocalMobile.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		000000000000000000000110 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000100 /* PhoneTransfer.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		000000000000000000000111 /* CoursLocalMobile */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000105 /* CoursLocalMobileApp.swift */,
+				000000000000000000000107 /* MobileRecorder.swift */,
+				000000000000000000000109 /* MacLink.swift */,
+				00000000000000000000010B /* MobileViews.swift */,
+				00000000000000000000011E /* MacRemote.swift */,
+				00000000000000000000010D /* Info.plist */,
+			);
+			path = CoursLocalMobile;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000000000006 /* CoursLocal */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000011 /* Build configuration list for PBXNativeTarget "CoursLocal" */;
+			buildPhases = (
+				00000000000000000000000A /* Sources */,
+				00000000000000000000000B /* Frameworks */,
+				00000000000000000000000C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CoursLocal;
+			packageProductDependencies = (
+				000000000000000000000014 /* WhisperKit */,
+			);
+			productName = CoursLocal;
+			productReference = 000000000000000000000008 /* CoursLocal.app */;
+			productType = "com.apple.product-type.application";
+		};
+		000000000000000000000007 /* CoursLocalTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000012 /* Build configuration list for PBXNativeTarget "CoursLocalTests" */;
+			buildPhases = (
+				00000000000000000000000D /* Sources */,
+				00000000000000000000000E /* Frameworks */,
+				00000000000000000000000F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				000000000000000000000029 /* PBXTargetDependency */,
+			);
+			name = CoursLocalTests;
+			productName = CoursLocalTests;
+			productReference = 000000000000000000000009 /* CoursLocalTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		000000000000000000000116 /* CoursLocalMobile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000119 /* Build configuration list for PBXNativeTarget "CoursLocalMobile" */;
+			buildPhases = (
+				000000000000000000000113 /* Sources */,
+				000000000000000000000114 /* Frameworks */,
+				000000000000000000000115 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CoursLocalMobile;
+			productName = CoursLocalMobile;
+			productReference = 000000000000000000000112 /* CoursLocalMobile.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					000000000000000000000006 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					000000000000000000000007 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 000000000000000000000006;
+					};
+					000000000000000000000116 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+				};
+			};
+			buildConfigurationList = 000000000000000000000010 /* Build configuration list for PBXProject "CoursLocal" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = fr;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				fr,
+				en,
+				Base,
+			);
+			mainGroup = 000000000000000000000002;
+			packageReferences = (
+				000000000000000000000013 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */,
+			);
+			productRefGroup = 000000000000000000000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000000000006 /* CoursLocal */,
+				000000000000000000000007 /* CoursLocalTests */,
+				000000000000000000000116 /* CoursLocalMobile */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		00000000000000000000000C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		00000000000000000000000F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		000000000000000000000115 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		00000000000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000017 /* AudioRecorder.swift in Sources */,
+				000000000000000000000019 /* ContentView.swift in Sources */,
+				00000000000000000000001C /* CoursLocalApp.swift in Sources */,
+				00000000000000000000001E /* CourseStore.swift in Sources */,
+				000000000000000000000021 /* LocalAI.swift in Sources */,
+				000000000000000000000023 /* Models.swift in Sources */,
+				000000000000000000000025 /* Pipeline.swift in Sources */,
+				000000000000000000000031 /* CleanDocument.swift in Sources */,
+				000000000000000000000033 /* ObsidianExport.swift in Sources */,
+				000000000000000000000035 /* Components.swift in Sources */,
+				000000000000000000000037 /* CourseDetailView.swift in Sources */,
+				000000000000000000000039 /* SettingsView.swift in Sources */,
+				00000000000000000000003B /* CourseSheet.swift in Sources */,
+				00000000000000000000003D /* RecordingShortcut.swift in Sources */,
+				00000000000000000000003F /* CourseChat.swift in Sources */,
+				000000000000000000000101 /* PhoneTransfer.swift in Sources */,
+				000000000000000000000104 /* PhoneReceiver.swift in Sources */,
+				00000000000000000000011D /* PhoneRemoteViews.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		00000000000000000000000D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000027 /* TextChunksTests.swift in Sources */,
+				00000000000000000000011B /* PhoneTransferTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		000000000000000000000113 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000102 /* PhoneTransfer.swift in Sources */,
+				000000000000000000000106 /* CoursLocalMobileApp.swift in Sources */,
+				000000000000000000000108 /* MobileRecorder.swift in Sources */,
+				00000000000000000000010A /* MacLink.swift in Sources */,
+				00000000000000000000010C /* MobileViews.swift in Sources */,
+				00000000000000000000011F /* MacRemote.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		000000000000000000000029 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000000000006 /* CoursLocal */;
+			targetProxy = 000000000000000000000028 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		00000000000000000000002A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		00000000000000000000002B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_TESTABILITY = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		00000000000000000000002C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CoursLocal/CoursLocal.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = CoursLocal/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = fr.baptiste.CoursLocal;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		00000000000000000000002D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CoursLocal/CoursLocal.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = CoursLocal/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = fr.baptiste.CoursLocal;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		00000000000000000000002E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = fr.baptiste.CoursLocalTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoursLocal.app/Contents/MacOS/CoursLocal";
+			};
+			name = Debug;
+		};
+		00000000000000000000002F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = fr.baptiste.CoursLocalTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoursLocal.app/Contents/MacOS/CoursLocal";
+			};
+			name = Release;
+		};
+		000000000000000000000117 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = M7KG55F9J5;
+				INFOPLIST_FILE = CoursLocalMobile/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = fr.baptiste.CoursLocal.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		000000000000000000000118 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = M7KG55F9J5;
+				INFOPLIST_FILE = CoursLocalMobile/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = fr.baptiste.CoursLocal.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		000000000000000000000010 /* Build configuration list for PBXProject "CoursLocal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				00000000000000000000002A /* Debug */,
+				00000000000000000000002B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000000000000000000000011 /* Build configuration list for PBXNativeTarget "CoursLocal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				00000000000000000000002C /* Debug */,
+				00000000000000000000002D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000000000000000000000012 /* Build configuration list for PBXNativeTarget "CoursLocalTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				00000000000000000000002E /* Debug */,
+				00000000000000000000002F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000000000000000000000119 /* Build configuration list for PBXNativeTarget "CoursLocalMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000000000117 /* Debug */,
+				000000000000000000000118 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		000000000000000000000013 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/argmax-oss-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		000000000000000000000014 /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000013 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */;
+			productName = WhisperKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 000000000000000000000001 /* Project object */;
 }

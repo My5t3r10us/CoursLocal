@@ -14,23 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "000000000000000000000006"
-               BuildableName = "CoursLocal.app"
-               BlueprintName = "CoursLocal"
-               ReferencedContainer = "container:CoursLocal.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "000000000000000000000007"
-               BuildableName = "CoursLocalTests.xctest"
-               BlueprintName = "CoursLocalTests"
+               BlueprintIdentifier = "000000000000000000000116"
+               BuildableName = "CoursLocalMobile.app"
+               BlueprintName = "CoursLocalMobile"
                ReferencedContainer = "container:CoursLocal.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -42,16 +28,6 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "000000000000000000000007"
-               BuildableName = "CoursLocalTests.xctest"
-               BlueprintName = "CoursLocalTests"
-               ReferencedContainer = "container:CoursLocal.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
@@ -68,9 +44,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "000000000000000000000006"
-            BuildableName = "CoursLocal.app"
-            BlueprintName = "CoursLocal"
+            BlueprintIdentifier = "000000000000000000000116"
+            BuildableName = "CoursLocalMobile.app"
+            BlueprintName = "CoursLocalMobile"
             ReferencedContainer = "container:CoursLocal.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -85,9 +61,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "000000000000000000000006"
-            BuildableName = "CoursLocal.app"
-            BlueprintName = "CoursLocal"
+            BlueprintIdentifier = "000000000000000000000116"
+            BuildableName = "CoursLocalMobile.app"
+            BlueprintName = "CoursLocalMobile"
             ReferencedContainer = "container:CoursLocal.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
