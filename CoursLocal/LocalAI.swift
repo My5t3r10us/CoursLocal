@@ -41,6 +41,27 @@ enum AIProvider: String, CaseIterable, Identifiable, Sendable {
     static var current: AIProvider { AIProvider(rawValue: UserDefaults.standard.string(forKey: "aiProvider") ?? "") ?? .local }
 }
 
+/// How hard an OpenRouter model thinks before answering. Models without reasoning ignore it.
+enum ReasoningEffort: String, CaseIterable, Identifiable, Sendable {
+    case auto, none, minimal, low, medium, high, xhigh, max
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .auto: return "Par défaut du modèle"; case .none: return "Désactivé"; case .minimal: return "Minimal"
+        case .low: return "Faible"; case .medium: return "Moyen"; case .high: return "Élevé"; case .xhigh: return "Très élevé"; case .max: return "Maximal"
+        }
+    }
+    /// The `reasoning` object of the request. The thinking stays out of the answer either way.
+    var payload: [String: Any] { self == .auto ? ["exclude": true] : ["effort": rawValue, "exclude": true] }
+    /// OpenRouter gives the thinking a share of max_tokens (about 50 % at medium, 80 % at high),
+    /// so the budget grows with the effort to leave room for the answer itself.
+    var tokenFactor: Double {
+        switch self { case .none, .minimal, .low: return 1; case .auto, .medium: return 1.5; case .high: return 2.5; case .xhigh, .max: return 4 }
+    }
+    static let storageKey = "openRouterReasoning"
+    static var current: ReasoningEffort { ReasoningEffort(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .low }
+}
+
 struct AISettings: Sendable {
     var baseURL: String
     var model: String
@@ -49,6 +70,7 @@ struct AISettings: Sendable {
     var apiKey: String
     var provider: AIProvider = .local
     var denyDataCollection = true
+    var reasoning: ReasoningEffort = .low
     var generateSheet = false
     @MainActor static func current() throws -> Self {
         let d = UserDefaults.standard; let provider = AIProvider.current
@@ -56,11 +78,16 @@ struct AISettings: Sendable {
                     model: d.string(forKey: provider.modelKey) ?? "",
                     whisperModel: d.string(forKey: "whisperModel") ?? "large-v3-v20240930_626MB",
                     language: d.string(forKey: "language") ?? "fr", apiKey: try APIKeyStore.read(provider), provider: provider,
-                    denyDataCollection: d.object(forKey: "openRouterDenyDataCollection") as? Bool ?? true,
+                    denyDataCollection: d.object(forKey: "openRouterDenyDataCollection") as? Bool ?? true, reasoning: .current,
                     generateSheet: d.object(forKey: "generateSheet") as? Bool ?? true)
     }
     /// The API root: loopback only for the local server, a fixed address for OpenRouter.
     func endpoint() throws -> URL { provider == .local ? try LocalEndpoint(baseURL).base : AIProvider.openRouterBase }
+    /// The max_tokens actually sent: cloud budgets grow with the reasoning effort, up to 64 000 tokens.
+    func tokenBudget(_ maxTokens: Int) -> Int {
+        guard provider == .openRouter else { return maxTokens }
+        return Swift.max(maxTokens, Swift.min(64_000, Int(Double(maxTokens) * reasoning.tokenFactor)))
+    }
     func configuration(revision: Int) -> ProcessingConfiguration {
         ProcessingConfiguration(whisperModel: whisperModel, language: language, studyModel: model, baseURL: baseURL, transcriptRevision: revision)
     }
@@ -157,11 +184,15 @@ struct RapidModel: Decodable, Identifiable, Sendable {
 struct CloudModel: Decodable, Identifiable, Sendable, Hashable {
     struct Pricing: Decodable, Sendable, Hashable { let prompt: String?; let completion: String? }
     struct Architecture: Decodable, Sendable, Hashable { let input_modalities: [String]?; let output_modalities: [String]? }
+    /// Present only for models that can reason.
+    struct Reasoning: Decodable, Sendable, Hashable { let supported_efforts: [String]?; let default_effort: String?; let mandatory: Bool? }
     let id: String
     let name: String?
     let context_length: Int?
     let pricing: Pricing?
     let architecture: Architecture?
+    let reasoning: Reasoning?
+    let supported_parameters: [String]?
     var displayName: String { name ?? id }
     var promptPrice: Double? { pricing?.prompt.flatMap(Double.init).flatMap { $0 >= 0 ? $0 : nil } }
     var completionPrice: Double? { pricing?.completion.flatMap(Double.init).flatMap { $0 >= 0 ? $0 : nil } }
@@ -169,6 +200,10 @@ struct CloudModel: Decodable, Identifiable, Sendable, Hashable {
     var producesText: Bool {
         (architecture?.output_modalities?.contains("text") ?? true) && (architecture?.input_modalities?.contains("text") ?? true)
     }
+    var canReason: Bool { reasoning != nil || supported_parameters?.contains("reasoning") == true }
+    var reasoningIsMandatory: Bool { reasoning?.mandatory == true }
+    /// Efforts the model accepts, when OpenRouter lists them; others are mapped to the nearest level.
+    var supportedEfforts: [ReasoningEffort]? { reasoning?.supported_efforts.map { $0.compactMap(ReasoningEffort.init(rawValue:)) }.flatMap { $0.isEmpty ? nil : $0 } }
     /// Rough cost of cleaning a two-hour course: about 60 000 tokens sent and 40 000 received.
     var twoHourCost: Double? { promptPrice.flatMap { p in completionPrice.map { p * 60_000 + $0 * 40_000 } } }
 }
@@ -312,7 +347,7 @@ final class RapidMLXClient: @unchecked Sendable {
         else if json || schema != nil { format = ["type": "json_object"] }
         let reply = try await complete(settings: settings, messages: [["role": "system", "content": system], ["role": "user", "content": "\(task)\n\n<source>\n\(source)\n</source>"]],
                                        temperature: 0.1, responseFormat: format, maxTokens: maxTokens)
-        if reply.truncated { throw CourseError.truncated("Réponse tronquée : limite de \(maxTokens) tokens atteinte.") }
+        if reply.truncated { throw CourseError.truncated("Réponse tronquée : limite de \(settings.tokenBudget(maxTokens)) tokens atteinte.") }
         return reply.text
     }
 
@@ -330,11 +365,12 @@ final class RapidMLXClient: @unchecked Sendable {
         }
         if settings.provider == .openRouter && settings.apiKey.isEmpty { throw CourseError.unauthorized("Ajoute ta clé OpenRouter dans les réglages.") }
         let endpoint = try settings.endpoint()
+        let maxTokens = settings.tokenBudget(maxTokens)
         var payload: [String: Any] = ["model": settings.model, "stream": false, "temperature": temperature, "max_tokens": maxTokens, "messages": messages]
         if settings.provider == .openRouter {
-            // Reasoning models count their thinking in max_tokens: keep it short and out of the answer.
-            // Models without reasoning ignore this field.
-            payload["reasoning"] = ["effort": "low", "exclude": true]
+            // Reasoning models count their thinking in max_tokens, which tokenBudget accounts for; it stays
+            // out of the answer. Models without reasoning ignore this field.
+            payload["reasoning"] = settings.reasoning.payload
             if settings.denyDataCollection { payload["provider"] = ["data_collection": "deny"] }
         }
         if let responseFormat { payload["response_format"] = responseFormat }

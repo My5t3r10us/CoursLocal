@@ -131,6 +131,7 @@ private struct LocalAISection: View {
 private struct OpenRouterSection: View {
     @AppStorage("openRouterModel") private var model = ""
     @AppStorage("openRouterDenyDataCollection") private var deny = true
+    @AppStorage(ReasoningEffort.storageKey) private var reasoning: ReasoningEffort = .low
     @State private var draft = ""
     @State private var status: SettingsStatus?
     @State private var models: [CloudModel] = []
@@ -164,12 +165,24 @@ private struct OpenRouterSection: View {
                     Text(ModelBrowser.summary(selected)).font(.caption).foregroundStyle(.secondary)
                 }
             }
+            Picker("Raisonnement", selection: $reasoning) { ForEach(ReasoningEffort.allCases) { Text($0.label).tag($0) } }
+            if let note = reasoningNote { Text(note).font(.caption).foregroundStyle(.secondary) }
             Toggle("Exclure les fournisseurs qui conservent ou réutilisent les données", isOn: $deny)
         } header: { Text("Modèle") } footer: {
-            Text("Un cours de 2 h représente environ 60 000 tokens envoyés et 40 000 reçus. Le filtre de confidentialité réduit le nombre de modèles et de fournisseurs utilisables ; désactive-le si une requête est refusée faute de fournisseur.")
+            Text("Un cours de 2 h représente environ 60 000 tokens envoyés et 40 000 reçus. Un raisonnement plus poussé améliore parfois la fiche mais ajoute des tokens facturés et ralentit le traitement. Le filtre de confidentialité réduit le nombre de modèles et de fournisseurs utilisables ; désactive-le si une requête est refusée faute de fournisseur.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .sheet(isPresented: $browsing) { ModelBrowser(models: models, selection: $model) }
+    }
+    /// What the chosen effort means for the selected model, once the catalogue has been loaded.
+    private var reasoningNote: String? {
+        guard let selected else { return nil }
+        guard selected.canReason else { return "Ce modèle ne raisonne pas : ce réglage est ignoré." }
+        if reasoning == .none && selected.reasoningIsMandatory { return "Ce modèle raisonne toujours : choisis un autre niveau, sinon ses requêtes seront refusées." }
+        if let efforts = selected.supportedEfforts, ![.auto, .none].contains(reasoning), !efforts.contains(reasoning) {
+            return "Niveau non proposé par ce modèle, remplacé par le plus proche (" + efforts.map(\.label).joined(separator: ", ").lowercased() + ")."
+        }
+        return nil
     }
     /// Reading the stored key may show the keychain prompt, but only after this explicit click.
     private func key() throws -> String {
@@ -206,12 +219,13 @@ struct ModelBrowser: View {
     @Binding var selection: String
     @State private var query = ""
     @State private var freeOnly = false
+    @State private var reasoningOnly = false
     @State private var sortByPrice = false
     @State private var highlighted: String?
     @Environment(\.dismiss) private var dismiss
     private var filtered: [CloudModel] {
         let q = query.trimmed
-        let list = models.filter { (!freeOnly || $0.isFree) && (q.isEmpty || $0.displayName.localizedStandardContains(q) || $0.id.localizedStandardContains(q)) }
+        let list = models.filter { (!freeOnly || $0.isFree) && (!reasoningOnly || $0.canReason) && (q.isEmpty || $0.displayName.localizedStandardContains(q) || $0.id.localizedStandardContains(q)) }
         return sortByPrice ? list.sorted { ($0.twoHourCost ?? .infinity) < ($1.twoHourCost ?? .infinity) } : list
     }
     static func summary(_ model: CloudModel) -> String {
@@ -228,6 +242,7 @@ struct ModelBrowser: View {
             HStack {
                 TextField("Rechercher (nom ou identifiant)", text: $query).textFieldStyle(.roundedBorder)
                 Toggle("Gratuits", isOn: $freeOnly).toggleStyle(.checkbox)
+                Toggle("Raisonnement", isOn: $reasoningOnly).toggleStyle(.checkbox)
                 Picker("Tri", selection: $sortByPrice) { Text("Nom").tag(false); Text("Prix").tag(true) }.pickerStyle(.segmented).fixedSize()
             }
             List(filtered, id: \.id, selection: $highlighted) { model in
@@ -235,6 +250,7 @@ struct ModelBrowser: View {
                     HStack {
                         Text(model.displayName).fontWeight(.medium)
                         if model.isFree { Text("Gratuit").font(.caption2.weight(.semibold)).foregroundStyle(.green).padding(.horizontal, 5).background(Capsule().fill(.green.opacity(0.12))) }
+                        if model.canReason { Text("Raisonnement").font(.caption2.weight(.semibold)).foregroundStyle(.purple).padding(.horizontal, 5).background(Capsule().fill(.purple.opacity(0.12))) }
                     }
                     Text(Self.summary(model)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }

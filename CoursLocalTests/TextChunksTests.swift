@@ -806,6 +806,30 @@ extension OpenRouterTests {
         let schema = try XCTUnwrap((format["json_schema"] as? [String: Any])?["schema"] as? [String: Any])
         XCTAssertEqual(schema["required"] as? [String], ["corrections", "paragraphs"]); XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
     }
+    func testReasoningEffortIsSentAndWidensTheTokenBudget() async throws {
+        var body: [String: Any] = [:]
+        let client = HTTPMock.client { request in body = try JSONSerialization.jsonObject(with: HTTPMock.body(request)) as! [String: Any]; return (200, [:], try HTTPMock.completion("Texte")) }
+        var high = settings; high.reasoning = .high
+        _ = try await client.generate(settings: high, task: "", source: "", maxTokens: 16_000)
+        XCTAssertEqual((body["reasoning"] as? [String: Any])?["effort"] as? String, "high")
+        XCTAssertEqual((body["reasoning"] as? [String: Any])?["exclude"] as? Bool, true)
+        XCTAssertEqual(body["max_tokens"] as? Int, 40_000)
+        var auto = settings; auto.reasoning = .auto
+        _ = try await client.generate(settings: auto, task: "", source: "", maxTokens: 60_000)
+        XCTAssertNil((body["reasoning"] as? [String: Any])?["effort"]); XCTAssertEqual(body["max_tokens"] as? Int, 64_000)
+        var off = settings; off.reasoning = .none
+        _ = try await client.generate(settings: off, task: "", source: "", maxTokens: 8000)
+        XCTAssertEqual((body["reasoning"] as? [String: Any])?["effort"] as? String, "none"); XCTAssertEqual(body["max_tokens"] as? Int, 8000)
+        XCTAssertEqual(AISettings(baseURL: "http://127.0.0.1:8000/v1", model: "local", whisperModel: "small", language: "fr", apiKey: "", reasoning: .max).tokenBudget(1500), 1500)
+    }
+    func testCatalogueFlagsReasoningModels() throws {
+        let data = Data("""
+        {"id":"a/think","reasoning":{"supported_efforts":["low","high","bogus"],"default_effort":"medium","mandatory":true}}
+        """.utf8)
+        let model = try JSONDecoder().decode(CloudModel.self, from: data)
+        XCTAssertTrue(model.canReason); XCTAssertTrue(model.reasoningIsMandatory); XCTAssertEqual(model.supportedEfforts, [.low, .high])
+        XCTAssertFalse(try JSONDecoder().decode(CloudModel.self, from: Data("{\"id\":\"a/plain\"}".utf8)).canReason)
+    }
     func testLocalServerGetsJSONModeWithoutReasoningOrSchema() async throws {
         var body: [String: Any] = [:]
         let client = HTTPMock.client { request in
