@@ -19,11 +19,12 @@ enum ObsidianMarkdown {
     }
 
     static func build(_ course: Course, layout: DocumentLayout = .themes, includeTranscript: Bool = true, includeText: Bool = true) -> String {
-        let groups = course.themeGroups
-        let hasSheet = !(course.sheet?.themes.isEmpty ?? true)
+        let groups = course.themeGroups, hasSheet = course.hasSheet
+        // Documents cleaned without themes are exported in the order of the course.
+        let layout = course.themed ? layout : .chronological
         // Below a sheet, the cleaned text moves one heading level down.
         let (themeLevel, sectionLevel, chronoLevel) = hasSheet ? ("###", "####", "###") : ("##", "###", "##")
-        var out = frontmatter(course, themes: groups.map(\.name))
+        var out = frontmatter(course, themes: course.themeNames)
         out += "# \(ThemeName.sanitize(course.title).nonEmpty ?? "Cours")\n\n"
         if course.incomplete { out += callout("warning", "Cours incomplet", "Certaines portions audio sont indisponibles ou exclues.") }
         if course.resultsObsolete { out += callout("warning", "Résultats obsolètes", "La transcription ou les sources ont été modifiées depuis la génération.") }
@@ -51,7 +52,7 @@ enum ObsidianMarkdown {
                 out += foldable("info", "Corrections de transcription (\(fixes.count))", rows.joined(separator: "\n"))
             }
         } else {
-            out += callout("todo", "Document à générer", "Lance « Nettoyer et structurer » dans CoursLocal.")
+            out += callout("todo", "Document à générer", "Lance « Nettoyer le texte » dans CoursLocal.")
         }
         if let legacy = course.legacyMarkdown { out += foldable("note", "Anciens résultats (notes et fiches)", legacy) }
         if includeTranscript && !course.sources.isEmpty {
@@ -75,34 +76,18 @@ enum ObsidianMarkdown {
 
     private static func sheet(_ course: Course) -> String {
         guard let sheet = course.sheet else { return "" }
-        let starts = Dictionary(course.themeGroups.map { ($0.name, $0.start) }, uniquingKeysWith: { a, _ in a })
-        var out = ""
-        if let overview = sheet.overview { out += callout("abstract", "L’essentiel", overview) }
-        else { out += callout("warning", "Fiche incomplète", "La synthèse globale n’a pas encore été générée.") }
-        if !sheet.takeaways.isEmpty { out += "## À retenir\n\n" + list(sheet.takeaways) + "\n\n" }
-        for theme in course.orderedThemeSheets {
-            out += "## \(theme.theme)\n\n"
-            if let start = starts[theme.theme] ?? nil { out += "`\(timestamp(start))`\n\n" }
-            out += theme.summary + "\n\n"
-            out += "**Points clés**\n\n" + list(theme.keyPoints) + "\n\n"
-            if !theme.definitions.isEmpty { out += "**Définitions**\n\n" + theme.definitions.map { "- **\($0.term)** : \($0.definition)" }.joined(separator: "\n") + "\n\n" }
-            if !theme.examples.isEmpty { out += "**Exemples**\n\n" + list(theme.examples) + "\n\n" }
-            if !theme.examHints.isEmpty { out += callout("important", "Signalé par le professeur", list(theme.examHints)) }
-        }
-        if !sheet.questions.isEmpty {
-            out += "## Questions de révision\n\n" + sheet.questions.map { foldable("question", $0.question, $0.answer) }.joined()
-        }
+        var out = sheet.markdown + "\n\n"
+        if !sheet.complete { out += callout("warning", "Fiche incomplète", "La fin du cours n’a pas encore été résumée.") }
         return out
     }
-    private static func list(_ items: [String]) -> String { items.map { "- " + $0 }.joined(separator: "\n") }
 
     private static func section(_ section: DocumentSection, level: String, showTheme: Bool) -> String {
-        var out = "\(level) \(section.title)\n\n"
+        var out = section.title.isEmpty ? "" : "\(level) \(section.title)\n\n"
         var meta: [String] = []
         if let start = section.start { meta.append("`\(timestamp(start))" + (section.end.map { " → \(timestamp($0))" } ?? "") + "`") }
-        if showTheme, let tag = ThemeName.tag(section.theme) { meta.append("#\(tag)") }
+        if showTheme, !section.theme.isEmpty, let tag = ThemeName.tag(section.theme) { meta.append("#\(tag)") }
         if !meta.isEmpty { out += meta.joined(separator: " · ") + "\n\n" }
-        if section.fallback { out += callout("caution", "Nettoyage simplifié", "Le modèle n’a pas pu structurer ce passage ; seules les hésitations évidentes ont été retirées.") }
+        if section.fallback { out += callout("caution", "Nettoyage simplifié", "Le modèle n’a pas pu réécrire ce passage ; seules les hésitations évidentes ont été retirées.") }
         return out + section.paragraphs.map(\.text).joined(separator: "\n\n") + "\n\n"
     }
 

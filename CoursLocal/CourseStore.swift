@@ -145,7 +145,11 @@ final class CourseStore: ObservableObject {
     func editSection(courseID: UUID, sectionIDs: [UUID], title: String, theme: String, text: String) async throws {
         guard !gate.busy else { throw CourseError.message("Attends la fin du traitement avant de modifier le document.") }
         let title = ThemeName.sanitize(title), theme = ThemeName.sanitize(theme)
-        guard !title.isEmpty, !theme.isEmpty else { throw CourseError.message("Le titre et le thème ne peuvent pas être vides.") }
+        let current = course(courseID)?.cleanBlocks.flatMap { $0.result?.sections ?? [] }.first { $0.id == sectionIDs.first }
+        // Passages cleaned without a title stay untitled; titled sections keep requiring both.
+        if current.map({ !$0.title.isEmpty || !$0.theme.isEmpty }) ?? true {
+            guard !title.isEmpty, !theme.isEmpty else { throw CourseError.message("Le titre et le thème ne peuvent pas être vides.") }
+        }
         let texts = text.components(separatedBy: "\n").split(whereSeparator: { $0.trimmed.isEmpty }).map { $0.joined(separator: " ").trimmed }
         try gate.acquire("Édition"); defer { gate.release() }
         try await update(courseID) { course in
@@ -176,7 +180,6 @@ final class CourseStore: ObservableObject {
             for raw in Set(course.cleanBlocks.flatMap { $0.result?.sections ?? [] }.map(\.theme)) where index.canonical(raw) == old { index.aliases[raw] = name }
             index.aliases[name] = name
             course.themeIndex = index
-            for i in course.sheet?.themes.indices ?? 0..<0 where course.sheet?.themes[i].theme == old { course.sheet?.themes[i].theme = name }
         }
     }
     func excludeDamagedParts(_ id: UUID) async throws {

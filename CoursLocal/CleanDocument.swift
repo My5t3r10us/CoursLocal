@@ -8,6 +8,8 @@ struct CleanParagraph: Codable, Identifiable, Sendable, Equatable {
     var references: [UUID]
 }
 
+/// A passage of the cleaned text. Documents cleaned before version 0.4 also have a title and a theme;
+/// newer ones leave both empty: titles and parts are written by the course sheet.
 struct CleanSection: Codable, Identifiable, Sendable {
     var id = UUID()
     var title: String
@@ -87,7 +89,7 @@ extension Course {
             let theme = index.canonical(section.theme)
             let refs = section.paragraphs.flatMap(\.references).compactMap { times[$0] }
             let start = refs.map(\.0).min(), end = refs.map(\.1).max()
-            if var last = output.last, last.title.folded == section.title.folded, last.theme == theme {
+            if var last = output.last, !section.title.isEmpty, last.title.folded == section.title.folded, last.theme == theme {
                 last.ids.append(section.id); last.paragraphs += section.paragraphs
                 last.fallback = last.fallback || section.fallback == true; last.edited = last.edited || section.edited == true
                 last.fallbackReason = last.fallbackReason ?? section.fallbackReason
@@ -100,6 +102,9 @@ extension Course {
         }
         return output
     }
+    /// Only documents cleaned before version 0.4 have themes.
+    var themed: Bool { documentSections.contains { !$0.theme.isEmpty } }
+    var themeNames: [String] { themeGroups.map(\.name).filter { !$0.isEmpty } }
     /// Themes in order of first appearance; a theme revisited later in the course keeps all its sections.
     var themeGroups: [ThemeGroup] {
         var groups: [ThemeGroup] = []
@@ -113,7 +118,7 @@ extension Course {
         var seen = Set<String>()
         return cleanBlocks.flatMap { $0.result?.fixes ?? [] }.filter { seen.insert($0.from.folded + "→" + $0.to.folded).inserted }
     }
-    var documentText: String { documentSections.map { "\($0.title)\n\($0.text)" }.joined(separator: "\n\n") }
+    var documentText: String { documentSections.map { ($0.title.isEmpty ? "" : $0.title + "\n") + $0.text }.joined(separator: "\n\n") }
     var wordCount: Int { (hasDocument ? documentText : sources.map(\.text).joined(separator: " ")).split(whereSeparator: \.isWhitespace).count }
 }
 
@@ -161,7 +166,7 @@ enum FillerFilter {
     }
 
     /// Used when the model fails twice: the content is never lost, only less polished.
-    static func fallback(_ block: CleanBlock, theme: String, reason: String? = nil) -> CleanResult {
+    static func fallback(_ block: CleanBlock, reason: String? = nil) -> CleanResult {
         var paragraphs: [CleanParagraph] = []; var text = ""; var refs: [UUID] = []
         for (line, id) in zip(block.lines, block.sourceIDs) {
             let cleaned = clean(line); guard !cleaned.isEmpty else { continue }
@@ -170,7 +175,7 @@ enum FillerFilter {
             if text.count > 700 { paragraphs.append(CleanParagraph(text: text, references: refs)); text = ""; refs = [] }
         }
         if !text.isEmpty { paragraphs.append(CleanParagraph(text: text, references: refs)) }
-        let section = CleanSection(title: "Passage non structuré", theme: theme, paragraphs: paragraphs, fallback: true, fallbackReason: reason)
+        let section = CleanSection(title: "", theme: "", paragraphs: paragraphs, fallback: true, fallbackReason: reason)
         return CleanResult(sections: paragraphs.isEmpty ? [] : [section])
     }
 }
@@ -180,31 +185,24 @@ enum FillerFilter {
 /// The JSON returned by the model for one block. Indices refer to the numbered lines of the prompt.
 struct CleanResponse: Decodable {
     struct Paragraph: Decodable { var text: String; var sources: [Int]? }
-    struct Section: Decodable { var title: String?; var theme: String?; var paragraphs: [Paragraph] }
     struct Fix: Decodable { var from: String; var to: String }
-    var sections: [Section]
+    var paragraphs: [Paragraph]
     var corrections: [Fix]?
 
-    /// Repairs what can be repaired safely (missing or out-of-range sources, empty titles) and rejects
+    /// Repairs what can be repaired safely (missing or out-of-range sources) and rejects
     /// what indicates lost or invented content.
-    func result(for block: CleanBlock, fallbackTheme: String) throws -> CleanResult {
-        var sections: [CleanSection] = []; var previous: [UUID] = [block.sourceIDs.first].compactMap { $0 }
+    func result(for block: CleanBlock) throws -> CleanResult {
+        var paragraphs: [CleanParagraph] = []; var previous: [UUID] = [block.sourceIDs.first].compactMap { $0 }
         var covered = Set<Int>(); var characters = 0
-        for raw in self.sections {
-            var paragraphs: [CleanParagraph] = []
-            for paragraph in raw.paragraphs {
-                let text = paragraph.text.trimmed; guard !text.isEmpty else { continue }
-                let valid = (paragraph.sources ?? []).filter { $0 >= 1 && $0 <= block.sourceIDs.count }
-                covered.formUnion(valid)
-                var seen = Set<UUID>(); let refs = valid.map { block.sourceIDs[$0 - 1] }.filter { seen.insert($0).inserted }
-                if !refs.isEmpty { previous = [refs.last!] }
-                paragraphs.append(CleanParagraph(text: text, references: refs.isEmpty ? previous : refs)); characters += text.count
-            }
-            guard !paragraphs.isEmpty else { continue }
-            let theme = ThemeName.sanitize(raw.theme ?? "").nonEmpty ?? sections.last?.theme ?? fallbackTheme
-            let title = ThemeName.sanitize(raw.title ?? "").nonEmpty ?? theme
-            sections.append(CleanSection(title: title, theme: theme, paragraphs: paragraphs))
+        for paragraph in self.paragraphs {
+            let text = paragraph.text.trimmed; guard !text.isEmpty else { continue }
+            let valid = (paragraph.sources ?? []).filter { $0 >= 1 && $0 <= block.sourceIDs.count }
+            covered.formUnion(valid)
+            var seen = Set<UUID>(); let refs = valid.map { block.sourceIDs[$0 - 1] }.filter { seen.insert($0).inserted }
+            if !refs.isEmpty { previous = [refs.last!] }
+            paragraphs.append(CleanParagraph(text: text, references: refs.isEmpty ? previous : refs)); characters += text.count
         }
+        let sections = paragraphs.isEmpty ? [] : [CleanSection(title: "", theme: "", paragraphs: paragraphs)]
         let source = block.characterCount
         guard !sections.isEmpty else { throw CourseError.invalidOutput("Aucun paragraphe nettoyé.") }
         // Removing tics rarely shortens a passage by half; a shorter answer is a summary, a longer one adds content.

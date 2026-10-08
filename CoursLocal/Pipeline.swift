@@ -3,12 +3,12 @@ import Combine
 import AVFoundation
 
 enum PipelinePhase: Int, CaseIterable, Sendable {
-    case checking, transcribing, cleaning, themes, sheet
+    case checking, transcribing, cleaning, sheet
     var label: String {
-        switch self { case .checking: return "Vérification"; case .transcribing: return "Transcription"; case .cleaning: return "Nettoyage"; case .themes: return "Thèmes"; case .sheet: return "Fiche" }
+        switch self { case .checking: return "Vérification"; case .transcribing: return "Transcription"; case .cleaning: return "Nettoyage"; case .sheet: return "Fiche" }
     }
     var symbol: String {
-        switch self { case .checking: return "checkmark.shield"; case .transcribing: return "waveform"; case .cleaning: return "wand.and.stars"; case .themes: return "square.stack.3d.up"; case .sheet: return "list.bullet.rectangle" }
+        switch self { case .checking: return "checkmark.shield"; case .transcribing: return "waveform"; case .cleaning: return "wand.and.stars"; case .sheet: return "list.bullet.rectangle" }
     }
 }
 
@@ -74,7 +74,7 @@ final class Pipeline: ObservableObject {
             // Earlier notes, cards and summaries are never touched: only the cleaned document is rebuilt.
             if regenerate || c.configuration != desired { c.cleanBlocks = []; c.themeIndex = nil; c.sheet = nil }
             if regenerateSheet { c.sheet = nil }
-            // Only simplified, unedited passages are sent again; themes are then harmonized anew.
+            // Only simplified, unedited passages are sent again.
             if retryFallbacks {
                 for i in c.cleanBlocks.indices where c.cleanBlocks[i].result?.sections.contains(where: { $0.fallback == true }) == true {
                     c.cleanBlocks[i].result = nil; c.themeIndex = nil; c.sheet = nil
@@ -107,47 +107,41 @@ final class Pipeline: ObservableObject {
             let block = course.cleanBlocks[index]
             if block.result != nil { continue }
             try await checkpoint(id, "Nettoyage \(index + 1)/\(count)", state: .generating, completed: index, total: count)
-            let done = course.cleanBlocks[..<index].compactMap(\.result).flatMap(\.sections)
-            var known: [String] = []
-            for section in done where !known.contains(section.theme) { known.append(section.theme) }
             let result: CleanResult
-            do { result = try await client.clean(settings: settings, block: block, knownThemes: known, previous: done.last) }
+            do { result = try await client.clean(settings: settings, block: block) }
             catch where CourseError.isModelOutput(error) && !Task.isCancelled {
                 // Never lose a passage because the model failed on it: keep the filtered text, flagged for review.
-                result = FillerFilter.fallback(block, theme: done.last?.theme ?? "Général", reason: error.localizedDescription)
+                result = FillerFilter.fallback(block, reason: error.localizedDescription)
             }
             try Task.checkCancellation()
             try await store.update(id) { $0.cleanBlocks[index].result = result }
         }
         if store.course(id)?.themeIndex == nil {
-            phase = .themes
-            try await checkpoint(id, "Harmonisation des thèmes", state: .generating, completed: 0, total: 1)
+            // Only documents partly cleaned before version 0.4 still have themes to harmonize.
             var counts: [(name: String, count: Int)] = []
-            for section in store.course(id)?.cleanBlocks.flatMap({ $0.result?.sections ?? [] }) ?? [] {
+            for section in store.course(id)?.cleanBlocks.flatMap({ $0.result?.sections ?? [] }) ?? [] where !section.theme.isEmpty {
                 if let i = counts.firstIndex(where: { $0.name == section.theme }) { counts[i].count += 1 } else { counts.append((section.theme, 1)) }
             }
-            let index = try await client.harmonize(settings: settings, themes: counts)
+            let index = counts.isEmpty ? ThemeIndex() : try await client.harmonize(settings: settings, themes: counts)
             try Task.checkCancellation()
             try await store.update(id) { $0.themeIndex = index; $0.sheet = nil }
         }
         if settings.generateSheet, store.course(id)?.sheetComplete != true {
             phase = .sheet
             guard let course = store.course(id) else { throw CourseError.message("Cours introuvable.") }
-            let groups = course.themeGroups
-            if course.sheet == nil { try await store.update(id) { $0.sheet = CourseSheet() } }
-            for (index, group) in groups.enumerated() {
+            let sources = SheetSources.chunks(course.documentSections, maxCharacters: client.sheetSourceLimit(settings))
+            guard !sources.isEmpty else { throw CourseError.message("Le texte nettoyé est vide : rien à résumer.") }
+            // The written parts only fit together if the text is cut the same way: otherwise the sheet starts again.
+            if course.sheet?.sourceCount != sources.count { try await store.update(id) { $0.sheet = CourseSheet(sourceCount: sources.count) } }
+            for (index, source) in sources.enumerated() {
                 try Task.checkCancellation()
-                if store.course(id)?.sheet?.themes.contains(where: { $0.theme == group.name }) == true { continue }
-                try await checkpoint(id, "Fiche \(index + 1)/\(groups.count) : \(group.name)", state: .generating, completed: index, total: groups.count + 1)
-                let sheet = try await client.themeSheet(settings: settings, group: group, courseTitle: course.title)
+                guard let current = store.course(id), let sheet = current.sheet else { throw CourseError.message("Cours introuvable.") }
+                if index < sheet.parts.count { continue }
+                try await checkpoint(id, sources.count == 1 ? "Rédaction de la fiche" : "Fiche \(index + 1)/\(sources.count)", state: .generating, completed: index, total: sources.count)
+                let part = try await client.sheetPart(settings: settings, courseTitle: current.title, source: source, written: sheet.markdown)
                 try Task.checkCancellation()
-                try await store.update(id) { $0.sheet?.themes.append(sheet) }
+                try await store.update(id) { $0.sheet?.parts.append(part) }
             }
-            try await checkpoint(id, "Fiche : l’essentiel du cours", state: .generating, completed: groups.count, total: groups.count + 1)
-            guard let current = store.course(id), let partial = current.sheet else { throw CourseError.message("Cours introuvable.") }
-            let complete = try await client.overview(settings: settings, courseTitle: current.title, sheet: partial, themes: current.orderedThemeSheets)
-            try Task.checkCancellation()
-            try await store.update(id) { $0.sheet = complete }
         }
         completed = 1; total = 1
     }

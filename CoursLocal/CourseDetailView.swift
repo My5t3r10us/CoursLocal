@@ -46,13 +46,15 @@ struct CourseView: View {
     init(course: Course, store: CourseStore, player: CourseAudioPlayer, gate: OperationGate, assistant: CourseAssistant, process: @escaping (ProcessMode) -> Void, reimport: @escaping () -> Void, delete: @escaping () -> Void = {}) {
         self.course = course; self.store = store; self.player = player; self.gate = gate; self.assistant = assistant
         self.process = process; self.reimport = reimport; self.delete = delete
-        _tab = State(initialValue: course.sheet?.themes.isEmpty == false ? .sheet : course.hasDocument || course.sources.isEmpty ? .document : .transcript)
+        _tab = State(initialValue: course.hasSheet ? .sheet : course.hasDocument || course.sources.isEmpty ? .document : .transcript)
     }
 
     private var canProcess: Bool { !gate.busy && !course.parts.isEmpty && course.state != .importIncomplete }
     private var captureActive: Bool { gate.operation == "Enregistrement" }
     private var processingThis: Bool { [.transcribing, .generating].contains(course.state) && gate.busy }
     private var groups: [ThemeGroup] { course.themeGroups }
+    /// Documents cleaned without themes are read in the order of the course.
+    private var effectiveLayout: DocumentLayout { course.themed ? layout : .chronological }
     private var tabs: [CourseTab] { CourseTab.allCases.filter { $0 != .archive || course.legacyMarkdown != nil } }
     /// Narrow column (small window, questions or outline panel open): header and controls stack vertically.
     private var compact: Bool { columnWidth < 680 }
@@ -92,7 +94,12 @@ struct CourseView: View {
                         .transition(.move(edge: .trailing))
                 } else if tab == .document && course.hasDocument && showOutline {
                     Divider()
-                    OutlineColumn(course: course, groups: groups, layout: layout, fixes: course.transcriptFixes.count) { scrollTarget = $0 }
+                    OutlineColumn(course: course, groups: groups, layout: effectiveLayout, fixes: course.transcriptFixes.count) { scrollTarget = $0 }
+                        .frame(width: 250)
+                        .transition(.move(edge: .trailing))
+                } else if tab == .sheet, course.hasSheet, showOutline {
+                    Divider()
+                    SheetOutline(blocks: sheetBlocks) { scrollTarget = $0 }
                         .frame(width: 250)
                         .transition(.move(edge: .trailing))
                 }
@@ -150,7 +157,7 @@ struct CourseView: View {
                 MetaLabel(symbol: "clock", text: shortDuration(course.duration))
                 MetaLabel(symbol: course.captureMode.symbol, text: course.applicationName.map { "\(course.captureMode.label) · \($0)" } ?? course.captureMode.label)
                 if course.hasDocument {
-                    MetaLabel(symbol: "square.stack.3d.up", text: groups.count == 1 ? "1 thème" : "\(groups.count) thèmes")
+                    if course.themed { MetaLabel(symbol: "square.stack.3d.up", text: groups.count == 1 ? "1 thème" : "\(groups.count) thèmes") }
                     MetaLabel(symbol: "text.alignleft", text: "\(course.wordCount.formatted()) mots")
                 }
             }
@@ -269,8 +276,10 @@ struct CourseView: View {
     @ViewBuilder private var tabTools: some View {
         switch tab {
         case .document where course.hasDocument:
-            Picker("Organisation", selection: $layout) { ForEach(DocumentLayout.allCases) { Text($0.label).tag($0) } }
-                .pickerStyle(.menu).labelsHidden().fixedSize().help("Organisation du document et de l’export")
+            if course.themed {
+                Picker("Organisation", selection: $layout) { ForEach(DocumentLayout.allCases) { Text($0.label).tag($0) } }
+                    .pickerStyle(.menu).labelsHidden().fixedSize().help("Organisation du document et de l’export")
+            }
             Button { showOutline.toggle() } label: { Image(systemName: "sidebar.right") }
                 .buttonStyle(.borderless).help(showOutline ? "Masquer le plan" : "Afficher le plan")
         case .transcript where !course.sources.isEmpty:
@@ -282,6 +291,10 @@ struct CourseView: View {
             .padding(.horizontal, 8).padding(.vertical, 5).frame(width: 240)
             .background(RoundedRectangle(cornerRadius: 7).fill(.quaternary.opacity(0.5)))
         case .sheet where course.sheet != nil:
+            if course.hasSheet {
+                Button { showOutline.toggle() } label: { Image(systemName: "sidebar.right") }
+                    .buttonStyle(.borderless).help(showOutline ? "Masquer le plan" : "Afficher le plan")
+            }
             Button { process(.regenerateSheet) } label: { Label("Régénérer la fiche", systemImage: "arrow.triangle.2.circlepath") }
                 .disabled(!canProcess).help("Recrée la fiche à partir du texte nettoyé actuel, y compris tes corrections")
         case .markdown:
@@ -305,21 +318,21 @@ struct CourseView: View {
 
     // MARK: Sheet
 
+    private var sheetBlocks: [MarkdownBlock] { MarkdownBlock.parse(course.sheet?.markdown ?? "") }
+
     @ViewBuilder private var sheetTab: some View {
-        if let sheet = course.sheet, !sheet.themes.isEmpty {
-            let colors = Dictionary(groups.enumerated().map { ($0.element.name, ThemePalette.color($0.offset)) }, uniquingKeysWith: { a, _ in a })
-            let starts = Dictionary(groups.map { ($0.name, $0.start) }, uniquingKeysWith: { a, _ in a })
+        if let sheet = course.sheet, course.hasSheet {
             if !sheet.complete && !processingThis {
-                NoticeView(symbol: "list.bullet.rectangle", tint: .orange, title: "Fiche incomplète", message: "Certaines parties ou la synthèse globale manquent encore.") {
+                NoticeView(symbol: "list.bullet.rectangle", tint: .orange, title: "Fiche incomplète", message: "La fin du cours n’a pas encore été résumée.") {
                     Button("Terminer la fiche") { process(.normal) }.disabled(!canProcess)
                 }
             }
-            SheetView(sheet: sheet, themes: course.orderedThemeSheets, colors: colors, starts: starts, canPlay: !captureActive, play: listen)
+            SheetMarkdownView(blocks: sheetBlocks)
         } else {
             EmptyStateView(symbol: processingThis ? "hourglass" : "list.bullet.rectangle",
                            title: processingThis ? "Traitement en cours…" : "Pas encore de fiche de cours",
                            message: !generateSheet ? "La fiche de cours est désactivée dans Réglages → Général."
-                               : course.documentComplete ? "La fiche résume le texte nettoyé : l’essentiel, les points clés et définitions de chaque thème, les exemples, ce que le professeur signale comme important et des questions de révision."
+                               : course.documentComplete ? "L’IA résume le texte nettoyé en petits paragraphes et organise elle-même le cours : titres, parties et forme adaptés à son contenu."
                                : "La fiche sera créée après le nettoyage du texte.") {
                 if !processingThis && generateSheet && course.documentComplete {
                     Button { process(.normal) } label: { Label("Créer la fiche de cours", systemImage: "list.bullet.rectangle") }
@@ -337,16 +350,16 @@ struct CourseView: View {
                            title: processingThis ? "Traitement en cours…" : "Aucun document pour l’instant",
                            message: course.parts.isEmpty
                                ? "Ce cours ne contient pas encore d’audio."
-                               : "CoursLocal va transcrire l’audio, retirer les tics de langage, corriger les erreurs de transcription, puis découper le texte en paragraphes et en thèmes.") {
+                               : "CoursLocal va transcrire l’audio, retirer les tics de langage, corriger les erreurs de transcription et réécrire le texte proprement, en paragraphes, sans le restructurer.") {
                 if !processingThis && !course.parts.isEmpty {
-                    Button { process(.normal) } label: { Label("Nettoyer et structurer", systemImage: "wand.and.stars") }
+                    Button { process(.normal) } label: { Label("Nettoyer le texte", systemImage: "wand.and.stars") }
                         .buttonStyle(.borderedProminent).controlSize(.large).disabled(!canProcess)
                 }
             }
         } else {
             let colors = Dictionary(groups.enumerated().map { ($0.element.name, ThemePalette.color($0.offset)) }, uniquingKeysWith: { a, _ in a })
             VStack(alignment: .leading, spacing: 34) {
-                switch layout {
+                switch effectiveLayout {
                 case .themes:
                     ForEach(groups) { group in
                         VStack(alignment: .leading, spacing: 18) {
@@ -382,7 +395,7 @@ struct CourseView: View {
 
     private func sectionView(_ section: DocumentSection, color: Color, showTheme: Bool) -> some View {
         let active = player.currentCourseID == course.id && player.playing && (section.start ?? .infinity) <= player.position && player.position <= (section.end ?? -1)
-        return SectionView(section: section, color: color, showTheme: showTheme, active: active, editable: !gate.busy, canPlay: !captureActive,
+        return SectionView(section: section, color: color, showTheme: showTheme && !section.theme.isEmpty, active: active, editable: !gate.busy, canPlay: !captureActive,
                            play: listen, edit: { sheet = .section(section) })
             .id("section:" + section.id.uuidString)
     }
@@ -494,11 +507,11 @@ struct SectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(section.title).font(.system(size: 17, weight: .semibold)).textSelection(.enabled)
+                if !section.title.isEmpty { Text(section.title).font(.system(size: 17, weight: .semibold)).textSelection(.enabled) }
                 if section.edited { Image(systemName: "pencil.circle.fill").foregroundStyle(.secondary).help("Modifiée à la main") }
                 Spacer(minLength: 8)
                 Button(action: edit) { Image(systemName: "square.and.pencil") }
-                    .buttonStyle(.borderless).foregroundStyle(.secondary).opacity(hovering ? 1 : 0).disabled(!editable).help("Modifier la section")
+                    .buttonStyle(.borderless).foregroundStyle(.secondary).opacity(hovering ? 1 : 0).disabled(!editable).help(section.title.isEmpty ? "Modifier le passage" : "Modifier la section")
                 if let start = section.start {
                     Button { play(start) } label: {
                         Label(timestamp(start), systemImage: active ? "speaker.wave.2.fill" : "play.fill").font(.caption.monospacedDigit())
@@ -511,7 +524,7 @@ struct SectionView: View {
             if showTheme { ThemeChip(name: section.theme, color: color) }
             if section.fallback {
                 Label("Nettoyage simplifié : à relire.", systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
-                    .help(section.fallbackReason ?? "Le modèle n’a pas pu structurer ce passage.")
+                    .help(section.fallbackReason ?? "Le modèle n’a pas pu réécrire ce passage.")
             }
             ForEach(section.paragraphs) { paragraph in
                 Text(paragraph.text).font(.system(size: 15)).lineSpacing(5).textSelection(.enabled)
@@ -622,7 +635,7 @@ struct OutlineColumn: View {
     private func sectionLink(_ section: DocumentSection) -> some View {
         Button { jump("section:" + section.id.uuidString) } label: {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(section.title).font(.callout).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.leading)
+                Text(section.title.nonEmpty ?? String(section.text.prefix(80))).font(.callout).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.leading)
                 Spacer(minLength: 4)
                 if let start = section.start { Text(timestamp(start)).font(.caption2.monospacedDigit()).foregroundStyle(.tertiary) }
             }.contentShape(Rectangle())
@@ -650,129 +663,154 @@ struct EmptyStateView<Actions: View>: View {
 
 // MARK: - Course sheet
 
-struct SheetView: View {
-    let sheet: CourseSheet
-    let themes: [ThemeSheet]
-    let colors: [String: Color]
-    let starts: [String: Double?]
-    let canPlay: Bool
-    let play: (Double) -> Void
-    var body: some View {
-        VStack(alignment: .leading, spacing: 30) {
-            if let overview = sheet.overview {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("L’essentiel", systemImage: "sparkles").font(.headline).foregroundStyle(.tint)
-                    Text(overview).font(.system(size: 15)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(18).frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.accentColor.opacity(0.07)))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.accentColor.opacity(0.2)))
-            }
-            if !sheet.takeaways.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("À retenir").font(.system(size: 22, weight: .bold))
-                    ForEach(Array(sheet.takeaways.enumerated()), id: \.offset) { index, item in
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Text("\(index + 1)").font(.caption.bold()).foregroundStyle(.white)
-                                .frame(width: 20, height: 20).background(Circle().fill(Color.accentColor))
-                            Text(item).font(.system(size: 15)).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-            }
-            ForEach(themes) { theme in
-                ThemeSheetView(theme: theme, color: colors[theme.theme] ?? .accentColor, start: starts[theme.theme] ?? nil, canPlay: canPlay, play: play)
-                    .id("sheet:" + theme.theme)
-            }
-            if !sheet.questions.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("Questions de révision", systemImage: "questionmark.bubble").font(.system(size: 22, weight: .bold))
-                    ForEach(Array(sheet.questions.enumerated()), id: \.offset) { index, question in QuestionCard(index: index + 1, question: question) }
-                }
-            }
+/// One block of the Markdown written by the model.
+enum MarkdownBlock: Hashable {
+    case heading(level: Int, text: String)
+    case paragraph(String)
+    case bullets([(indent: Int, text: String)])
+    case numbered([(number: String, text: String)])
+    case quote(String)
+    case table([[String]])
+    case rule
+    static func == (a: Self, b: Self) -> Bool { String(describing: a) == String(describing: b) }
+    func hash(into hasher: inout Hasher) { hasher.combine(String(describing: self)) }
+
+    /// Block-level Markdown: headings, paragraphs, bullet and numbered lists, quotes, tables and rules.
+    static func parse(_ text: String) -> [MarkdownBlock] {
+        var blocks: [MarkdownBlock] = []; var paragraph: [String] = []
+        let bullet = try! NSRegularExpression(pattern: "^(\\s*)[-*+]\\s+(.*)$"), numbered = try! NSRegularExpression(pattern: "^\\s*(\\d+)[.)]\\s+(.*)$")
+        func match(_ regex: NSRegularExpression, _ line: String) -> [String]? {
+            guard let m = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) else { return nil }
+            return (1..<m.numberOfRanges).map { Range(m.range(at: $0), in: line).map { String(line[$0]) } ?? "" }
         }
+        func flush() { if !paragraph.isEmpty { blocks.append(.paragraph(paragraph.joined(separator: " "))); paragraph = [] } }
+        for raw in text.components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty { flush(); continue }
+            if line.hasPrefix("#") {
+                let level = line.prefix { $0 == "#" }.count, title = line.dropFirst(level)
+                if level <= 6, title.hasPrefix(" ") { flush(); blocks.append(.heading(level: level, text: String(title).trimmed.replacingOccurrences(of: "#+$", with: "", options: .regularExpression).trimmed)); continue }
+            }
+            if line.range(of: "^([-*_])\\s*(\\1\\s*){2,}$", options: .regularExpression) != nil { flush(); blocks.append(.rule); continue }
+            if let parts = match(bullet, raw) {
+                flush(); let item = (indent: parts[0].replacingOccurrences(of: "\t", with: "  ").count / 2, text: parts[1].trimmed)
+                if case .bullets(let items) = blocks.last { blocks[blocks.count - 1] = .bullets(items + [item]) } else { blocks.append(.bullets([item])) }
+                continue
+            }
+            if let parts = match(numbered, raw) {
+                flush(); let item = (number: parts[0], text: parts[1].trimmed)
+                if case .numbered(let items) = blocks.last { blocks[blocks.count - 1] = .numbered(items + [item]) } else { blocks.append(.numbered([item])) }
+                continue
+            }
+            if line.hasPrefix(">") {
+                flush(); let quoted = String(line.dropFirst()).trimmed
+                if case .quote(let previous) = blocks.last { blocks[blocks.count - 1] = .quote(previous + "\n" + quoted) } else { blocks.append(.quote(quoted)) }
+                continue
+            }
+            if line.hasPrefix("|") {
+                flush()
+                let cells = line.trimmingCharacters(in: CharacterSet(charactersIn: "|")).components(separatedBy: "|").map(\.trimmed)
+                if cells.allSatisfy({ $0.range(of: "^:?-{2,}:?$", options: .regularExpression) != nil }) { continue }
+                if case .table(let rows) = blocks.last { blocks[blocks.count - 1] = .table(rows + [cells]) } else { blocks.append(.table([cells])) }
+                continue
+            }
+            // A line that follows a list item without a blank line continues it.
+            if paragraph.isEmpty, case .bullets(var items) = blocks.last, raw.hasPrefix(" ") {
+                items[items.count - 1].text += " " + line; blocks[blocks.count - 1] = .bullets(items); continue
+            }
+            paragraph.append(line)
+        }
+        flush()
+        return blocks
     }
 }
 
-struct ThemeSheetView: View {
-    let theme: ThemeSheet
-    let color: Color
-    let start: Double?
-    let canPlay: Bool
-    let play: (Double) -> Void
+/// Text with inline Markdown (**bold**, *italic*, `code`).
+struct InlineText: View {
+    let value: String
+    init(_ value: String) { self.value = value }
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 5, height: 24)
-                Text(theme.theme).font(.system(size: 22, weight: .bold)).textSelection(.enabled)
-                Spacer()
-                if let start {
-                    Button { play(start) } label: { Label(timestamp(start), systemImage: "play.fill").font(.caption.monospacedDigit()) }
-                        .buttonStyle(.borderless).padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Capsule().fill(Color.secondary.opacity(0.1))).disabled(!canPlay).help("Écouter cette partie")
-                }
+        Text((try? AttributedString(markdown: value, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(value))
+            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// The course sheet as the model wrote it: whatever structure it chose is rendered as is.
+struct SheetMarkdownView: View {
+    let blocks: [MarkdownBlock]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
+                view(block).id("md:\(index)")
             }
-            Text(theme.summary).font(.system(size: 15)).lineSpacing(5).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-            block("Points clés", symbol: "checklist") {
-                ForEach(Array(theme.keyPoints.enumerated()), id: \.offset) { _, point in
+        }
+    }
+    @ViewBuilder private func view(_ block: MarkdownBlock) -> some View {
+        switch block {
+        case .heading(let level, let text):
+            switch level {
+            case ...2: InlineText(text).font(.system(size: 24, weight: .bold)).padding(.top, 18)
+            case 3: InlineText(text).font(.system(size: 19, weight: .semibold)).foregroundStyle(.tint).padding(.top, 8)
+            default: InlineText(text).font(.system(size: 16, weight: .semibold)).padding(.top, 4)
+            }
+        case .paragraph(let text):
+            InlineText(text).font(.system(size: 15)).lineSpacing(5)
+        case .bullets(let items):
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Circle().fill(color).frame(width: 6, height: 6).alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
-                        Text(point).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                        Circle().fill(item.indent > 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint)).frame(width: 5, height: 5).alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+                        InlineText(item.text).font(.system(size: 15)).lineSpacing(3)
+                    }.padding(.leading, CGFloat(item.indent) * 18)
+                }
+            }.padding(.leading, 4)
+        case .numbered(let items):
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(item.number + ".").font(.system(size: 15).monospacedDigit().weight(.semibold)).foregroundStyle(.tint)
+                        InlineText(item.text).font(.system(size: 15)).lineSpacing(3)
                     }
                 }
-            }
-            if !theme.definitions.isEmpty {
-                block("Définitions", symbol: "character.book.closed") {
-                    Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 8) {
-                        ForEach(theme.definitions, id: \.self) { definition in
-                            GridRow {
-                                Text(definition.term).fontWeight(.semibold).frame(maxWidth: 200, alignment: .leading)
-                                Text(definition.definition).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }.textSelection(.enabled)
+            }.padding(.leading, 4)
+        case .quote(let text):
+            InlineText(text).font(.system(size: 15)).lineSpacing(4).padding(.leading, 14).padding(.vertical, 4)
+                .overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 1.5).fill(.tint.opacity(0.5)).frame(width: 3) }
+        case .table(let rows):
+            Grid(alignment: .topLeading, horizontalSpacing: 16, verticalSpacing: 8) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                    GridRow { ForEach(Array(row.enumerated()), id: \.offset) { _, cell in InlineText(cell).font(.system(size: 14, weight: index == 0 ? .semibold : .regular)) } }
+                    if index == 0 { Divider() }
                 }
             }
-            if !theme.examples.isEmpty {
-                block("Exemples", symbol: "lightbulb") {
-                    ForEach(Array(theme.examples.enumerated()), id: \.offset) { _, example in
-                        Text("– " + example).foregroundStyle(.secondary).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-            if !theme.examHints.isEmpty {
-                NoticeView(symbol: "exclamationmark.bubble.fill", tint: .orange, title: "Signalé par le professeur",
-                           message: theme.examHints.map { "• " + $0 }.joined(separator: "\n"))
-            }
+            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.quaternary.opacity(0.35)))
+        case .rule:
+            Divider().padding(.vertical, 6)
         }
-        .padding(.leading, 2)
-    }
-    private func block<Content: View>(_ title: String, symbol: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: symbol).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-            content()
-        }
-        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.quaternary.opacity(0.35)))
     }
 }
 
-struct QuestionCard: View {
-    let index: Int
-    let question: SheetQuestion
-    @State private var reveal = false
+/// The plan of the sheet, made of the titles the model chose.
+struct SheetOutline: View {
+    let blocks: [MarkdownBlock]
+    let jump: (String) -> Void
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(index).").font(.headline).foregroundStyle(.tint)
-                Text(question.question).font(.headline).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                Spacer()
-                Button(reveal ? "Masquer" : "Voir la réponse") { withAnimation(.easeOut(duration: 0.15)) { reveal.toggle() } }
-                    .buttonStyle(.borderless)
-            }
-            if reveal { Text(question.answer).textSelection(.enabled).fixedSize(horizontal: false, vertical: true).transition(.opacity) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("PLAN").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
+                    if case .heading(let level, let text) = block, level <= 3 {
+                        Button { jump("md:\(index)") } label: {
+                            InlineText(text).font(level <= 2 ? .callout.weight(.semibold) : .callout).foregroundStyle(level <= 2 ? .primary : .secondary)
+                                .lineLimit(2).multilineTextAlignment(.leading).textSelection(.disabled)
+                                .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain).padding(.leading, level <= 2 ? 0 : 14).padding(.top, level <= 2 && index > 0 ? 6 : 0)
+                    }
+                }
+            }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.quaternary.opacity(0.35)))
+        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.4))
     }
 }

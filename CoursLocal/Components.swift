@@ -370,14 +370,15 @@ struct SectionEditorSheet: View {
     @State private var error: String?
     @State private var saving = false
     @Environment(\.dismiss) private var dismiss
+    private let titled: Bool
     init(section: DocumentSection, themes: [String], save: @escaping (String, String, String) async throws -> Void) {
-        self.themes = themes; self.save = save
+        self.themes = themes; self.save = save; titled = !section.title.isEmpty || !section.theme.isEmpty
         _title = State(initialValue: section.title); _theme = State(initialValue: section.theme); _text = State(initialValue: section.text)
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Modifier la section").font(.title3.bold())
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+            Text(titled ? "Modifier la section" : "Modifier le passage").font(.title3.bold())
+            if titled { Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
                 GridRow {
                     Text("Titre").foregroundStyle(.secondary)
                     TextField("Titre", text: $title).textFieldStyle(.roundedBorder)
@@ -390,17 +391,17 @@ struct SectionEditorSheet: View {
                             .menuStyle(.borderlessButton).fixedSize().help("Choisir un thème existant")
                     }
                 }
-            }
+            } }
             Text("Une ligne vide sépare deux paragraphes.").font(.caption).foregroundStyle(.secondary)
             EditorBox(text: $text)
             if let error { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red).font(.caption) }
             HStack {
-                Text("Laisser le texte vide supprime la section.").font(.caption).foregroundStyle(.tertiary)
+                Text(titled ? "Laisser le texte vide supprime la section." : "Laisser le texte vide supprime le passage.").font(.caption).foregroundStyle(.tertiary)
                 Spacer()
                 Button("Annuler") { dismiss() }.keyboardShortcut(.cancelAction).disabled(saving)
                 Button("Enregistrer") {
                     saving = true; Task { do { try await save(title, theme, text); dismiss() } catch { self.error = error.localizedDescription }; saving = false }
-                }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(saving || title.trimmed.isEmpty || theme.trimmed.isEmpty)
+                }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(saving || (titled && (title.trimmed.isEmpty || theme.trimmed.isEmpty)))
             }
         }
         .padding(24).frame(width: 720, height: 560).interactiveDismissDisabled(saving)

@@ -239,39 +239,39 @@ final class RapidMLXTests: XCTestCase {
     }
     func testMalformedCleaningGetsExactlyOneCorrectionAttempt() async throws {
         let id = UUID(); let block = CleanBlock(id: 0, sourceIDs: [id], lines: ["La mémoire de travail maintient l’information."])
-        let valid = "```json\n{\"sections\":[{\"title\":\"Définition\",\"theme\":\"Mémoire\",\"paragraphs\":[{\"text\":\"La mémoire de travail maintient l’information.\",\"sources\":[1]}]}],\"corrections\":[]}\n```"
+        let valid = "```json\n{\"paragraphs\":[{\"text\":\"La mémoire de travail maintient l’information.\",\"sources\":[1]}],\"corrections\":[]}\n```"
         var count = 0; let client = HTTPMock.client { _ in count += 1; return (200, [:], try HTTPMock.completion(count == 1 ? "bad JSON" : valid)) }
-        let result = try await client.clean(settings: settings, block: block, knownThemes: [], previous: nil)
-        XCTAssertEqual(result.sections.first?.paragraphs.first?.references, [id]); XCTAssertEqual(result.sections.first?.theme, "Mémoire"); XCTAssertEqual(count, 2)
+        let result = try await client.clean(settings: settings, block: block)
+        XCTAssertEqual(result.sections.first?.paragraphs.first?.references, [id]); XCTAssertEqual(result.sections.first?.title, ""); XCTAssertEqual(count, 2)
     }
     func testSummarizedCleaningIsRejectedAfterCorrection() async throws {
         let lines = (0..<6).map { "Ligne \($0) : " + String(repeating: "le professeur détaille une notion importante du cours ", count: 2) }
         let block = CleanBlock(id: 0, sourceIDs: lines.map { _ in UUID() }, lines: lines)
-        let summary = "{\"sections\":[{\"title\":\"Résumé\",\"theme\":\"Cours\",\"paragraphs\":[{\"text\":\"Une notion.\",\"sources\":[1,2,3,4,5,6]}]}]}"
+        let summary = "{\"paragraphs\":[{\"text\":\"Une notion.\",\"sources\":[1,2,3,4,5,6]}]}"
         var count = 0; let client = HTTPMock.client { _ in count += 1; return (200, [:], try HTTPMock.completion(summary)) }
-        do { _ = try await client.clean(settings: settings, block: block, knownThemes: [], previous: nil); XCTFail() }
+        do { _ = try await client.clean(settings: settings, block: block); XCTFail() }
         catch { XCTAssertTrue(CourseError.isModelOutput(error)) }
         XCTAssertEqual(count, 2)
     }
     func testTransportErrorsAreNotMistakenForInvalidOutput() async throws {
         var count = 0; let client = HTTPMock.client { _ in count += 1; return (401, [:], Data()) }
-        do { _ = try await client.clean(settings: settings, block: CleanBlock(id: 0, sourceIDs: [UUID()], lines: ["Texte"]), knownThemes: [], previous: nil); XCTFail() }
+        do { _ = try await client.clean(settings: settings, block: CleanBlock(id: 0, sourceIDs: [UUID()], lines: ["Texte"])); XCTFail() }
         catch { XCTAssertFalse(CourseError.isModelOutput(error)) }
         XCTAssertEqual(count, 1)
     }
-    func testCleaningPromptCarriesKnownThemesAndPreviousSection() async throws {
+    func testCleaningOnlyRewritesTheTextWithoutTitlesOrThemes() async throws {
         var prompt = ""
         let client = HTTPMock.client { request in
             let body = try JSONSerialization.jsonObject(with: HTTPMock.body(request)) as! [String: Any]
             prompt = ((body["messages"] as? [[String: String]])?.last?["content"]) ?? ""
-            return (200, [:], try HTTPMock.completion("{\"sections\":[{\"paragraphs\":[{\"text\":\"Suite du cours.\"}]}]}"))
+            return (200, [:], try HTTPMock.completion("{\"paragraphs\":[{\"text\":\"Suite du cours.\"}]}"))
         }
-        let previous = CleanSection(title: "Encodage", theme: "Mémoire", paragraphs: [])
-        let result = try await client.clean(settings: settings, block: CleanBlock(id: 1, sourceIDs: [UUID()], lines: ["Suite du cours."]), knownThemes: ["Mémoire", "Attention"], previous: previous)
-        XCTAssertTrue(prompt.contains("« Attention »")); XCTAssertTrue(prompt.contains("« Encodage »")); XCTAssertTrue(prompt.contains("[1] Suite du cours."))
-        // Missing title, theme and sources are repaired from context instead of failing.
-        XCTAssertEqual(result.sections.first?.theme, "Mémoire"); XCTAssertEqual(result.sections.first?.title, "Mémoire")
+        let result = try await client.clean(settings: settings, block: CleanBlock(id: 1, sourceIDs: [UUID()], lines: ["Suite du cours."]))
+        XCTAssertTrue(prompt.contains("Ne restructure pas")); XCTAssertFalse(prompt.contains("thème")); XCTAssertTrue(prompt.contains("[1] Suite du cours."))
+        // Titles and parts are left to the course sheet; missing sources are repaired instead of failing.
+        XCTAssertEqual(result.sections.count, 1); XCTAssertEqual(result.sections.first?.title, ""); XCTAssertEqual(result.sections.first?.theme, "")
         XCTAssertEqual(result.sections.first?.paragraphs.first?.references.count, 1)
+        XCTAssertNil((RapidMLXClient.cleaningSchema["properties"] as? [String: Any])?["sections"])
     }
     func testHarmonizationMapsEveryDetectedThemeAndSkipsSingleTheme() async throws {
         var count = 0
@@ -386,7 +386,7 @@ actor FakeTranscriber: CourseTranscribing {
 }
 
 final class PipelineTests: XCTestCase {
-    @MainActor func testFailedThemePassResumesWithoutRetranscribingOrRecleaning() async throws {
+    @MainActor func testFailedCleaningResumesWithoutRetranscribingAndKeepsTheOrderOfTheCourse() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = CourseStore(root: root); while !store.ready { try await Task.sleep(for: .milliseconds(10)) }
@@ -395,32 +395,29 @@ final class PipelineTests: XCTestCase {
         writer.append([Float](repeating: 0, count: 1600)); let written = await writer.finish()
         try await store.update(id) { $0.parts = written.parts; $0.state = .audioReady }
         let passage = Passage(start: 0, end: 0.1, text: "Euh, la notion est, euh, définie dans ce cours. Ensuite l’attention est abordée.")
-        let transcriber = FakeTranscriber(passages: [passage]); var chats = 0; var failThemes = true; var cleaningPrompt = ""
+        let transcriber = FakeTranscriber(passages: [passage]); var chats = 0; var failCleaning = true; var cleaningPrompt = ""
         let client = HTTPMock.client { request in
             if request.url!.path == "/health" { return (200, [:], Data("{}".utf8)) }
             if request.url!.path == "/v1/models" { return (200, [:], Data("{\"data\":[{\"id\":\"local-model\"}]}".utf8)) }
             chats += 1
-            if chats == 1 {
-                cleaningPrompt = String(data: HTTPMock.body(request), encoding: .utf8) ?? ""
-                return (200, [:], try HTTPMock.completion("{\"sections\":[{\"title\":\"Définition\",\"theme\":\"Notion\",\"paragraphs\":[{\"text\":\"La notion est définie dans ce cours.\",\"sources\":[1]}]},{\"title\":\"Attention\",\"theme\":\"Attention\",\"paragraphs\":[{\"text\":\"Ensuite l’attention est abordée.\",\"sources\":[1]}]}],\"corrections\":[{\"from\":\"notion\",\"to\":\"notion\"}]}"))
-            }
-            if failThemes { return (401, [:], Data()) }
-            return (200, [:], try HTTPMock.completion("{\"themes\":[{\"name\":\"Notions\",\"includes\":[\"Notion\"]},{\"name\":\"Attention\",\"includes\":[\"Attention\"]}],\"tags\":[\"cognition\"]}"))
+            cleaningPrompt = String(data: HTTPMock.body(request), encoding: .utf8) ?? ""
+            if failCleaning { return (401, [:], Data()) }
+            return (200, [:], try HTTPMock.completion("{\"paragraphs\":[{\"text\":\"La notion est définie dans ce cours.\",\"sources\":[1]},{\"text\":\"Ensuite l’attention est abordée.\",\"sources\":[1]}],\"corrections\":[{\"from\":\"notion\",\"to\":\"notion\"}]}"))
         }
         let pipeline = Pipeline(store: store, client: client, transcriber: transcriber)
         let settings = AISettings(baseURL: "http://127.0.0.1:8000/v1", model: "local-model", whisperModel: "small", language: "fr", apiKey: "")
         pipeline.process(id: id, settings: settings)
         while pipeline.busy { try await Task.sleep(for: .milliseconds(10)) }
-        XCTAssertEqual(store.course(id)?.state, .failed); XCTAssertEqual(store.course(id)?.documentSections.count, 2)
+        XCTAssertEqual(store.course(id)?.state, .failed); XCTAssertFalse(store.course(id)?.hasDocument == true)
         XCTAssertTrue(cleaningPrompt.contains("[1] La notion est, définie dans ce cours."), "Obvious hesitations are filtered before reaching the model.")
-        failThemes = false; pipeline.process(id: id, settings: settings)
+        failCleaning = false; pipeline.process(id: id, settings: settings)
         while pipeline.busy { try await Task.sleep(for: .milliseconds(10)) }
         let course = try XCTUnwrap(store.course(id))
-        XCTAssertEqual(course.state, .ready); XCTAssertEqual(course.themeGroups.map(\.name), ["Notions", "Attention"])
-        XCTAssertEqual(course.themeIndex?.tags, ["cognition"]); XCTAssertTrue(course.transcriptFixes.isEmpty)
-        let calls = await transcriber.calls; XCTAssertEqual(calls, 1); XCTAssertEqual(chats, 3)
-        let loaded = await CourseRepository(root: root).load(); XCTAssertEqual(loaded.courses.first?.themeGroups.count, 2)
-        XCTAssertTrue(loaded.courses.first?.markdown.contains("## Notions") == true)
+        XCTAssertEqual(course.state, .ready); XCTAssertFalse(course.themed); XCTAssertTrue(course.themeNames.isEmpty)
+        XCTAssertEqual(course.documentSections.count, 1); XCTAssertEqual(course.documentSections[0].paragraphs.count, 2); XCTAssertTrue(course.transcriptFixes.isEmpty)
+        let calls = await transcriber.calls; XCTAssertEqual(calls, 1); XCTAssertEqual(chats, 2, "No theme request: the cleaned text is not restructured.")
+        let loaded = await CourseRepository(root: root).load()
+        XCTAssertTrue(loaded.courses.first?.markdown.contains("`00:00:00 → 00:00:00`\n\nLa notion est définie dans ce cours.\n\nEnsuite l’attention est abordée.") == true)
     }
     @MainActor func testModelFailureFallsBackToFilteredTextInsteadOfLosingThePassage() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -482,14 +479,23 @@ final class InterfaceRenderingTests: XCTestCase {
             ], fixes: [TranscriptFix(from: "mémoire de travaille", to: "mémoire de travail")]))]
             c.themeIndex = ThemeIndex(aliases: ["Mémoire": "Mémoire de travail"], tags: ["memoire"])
             c.summary = "Ancien résumé conservé."
-            c.sheet = CourseSheet(themes: [
-                ThemeSheet(theme: "Mémoire de travail", summary: "La mémoire de travail maintient temporairement les informations utiles à une tâche.",
-                           keyPoints: ["Capacité limitée à quelques éléments.", "Indispensable au raisonnement."],
-                           definitions: [SheetDefinition(term: "Mémoire de travail", definition: "Système de maintien temporaire de l’information.")],
-                           examples: ["Retenir un numéro le temps de le composer."], examHints: ["La définition tombe souvent à l’examen."]),
-                ThemeSheet(theme: "Attention", summary: "L’attention filtre l’information pertinente.", keyPoints: ["Elle est sélective."])
-            ], overview: "Le cours présente la mémoire de travail puis le rôle de l’attention.", takeaways: ["La mémoire de travail est limitée.", "L’attention sélectionne."],
-               questions: [SheetQuestion(question: "Qu’est-ce que la mémoire de travail ?", answer: "Un système de maintien temporaire.")])
+            c.sheet = CourseSheet(sourceCount: 1, parts: ["""
+            ## Une mémoire pour agir
+
+            La **mémoire de travail** maintient temporairement les informations utiles à une tâche. Sa capacité est limitée à quelques éléments.
+
+            ### Ce qui la limite
+            - Capacité de quatre éléments environ.
+            - Indispensable au raisonnement.
+
+            | Système | Durée |
+            | --- | --- |
+            | Mémoire de travail | Quelques secondes |
+
+            ## Le filtre de l’attention
+
+            L’attention sélectionne l’information pertinente avant qu’elle n’entre en mémoire de travail.
+            """])
         }
         let course = try XCTUnwrap(store.course(id))
         let view = CourseView(course: course, store: store, player: CourseAudioPlayer(), gate: store.gate, assistant: CourseAssistant(store: store), process: { _ in }, reimport: {})
@@ -653,11 +659,11 @@ final class CleaningTests: XCTestCase {
         let ids = [UUID(), UUID(), UUID()]
         let block = CleanBlock(id: 0, sourceIDs: ids, lines: ["la mémoire de travaille", "est limitée", "à quelques éléments"])
         let json = """
-        {"sections":[{"title":"# Capacité [1]","theme":"","paragraphs":[{"text":"La mémoire de travail est limitée","sources":[1,2,9]},{"text":"à quelques éléments.","sources":[]}]}],
+        {"paragraphs":[{"text":"La mémoire de travail est limitée","sources":[1,2,9]},{"text":"à quelques éléments.","sources":[]}],
          "corrections":[{"from":"travaille","to":"travail"},{"from":"absent","to":"inventé"},{"from":"est","to":"Est"}]}
         """
-        let result = try JSONDecoder().decode(CleanResponse.self, from: Data(json.utf8)).result(for: block, fallbackTheme: "Mémoire")
-        XCTAssertEqual(result.sections.first?.title, "Capacité 1"); XCTAssertEqual(result.sections.first?.theme, "Mémoire")
+        let result = try JSONDecoder().decode(CleanResponse.self, from: Data(json.utf8)).result(for: block)
+        XCTAssertEqual(result.sections.count, 1); XCTAssertEqual(result.sections.first?.title, "")
         XCTAssertEqual(result.sections.first?.paragraphs.map(\.references), [[ids[0], ids[1]], [ids[1]]])
         XCTAssertEqual(result.fixes, [TranscriptFix(from: "travaille", to: "travail")])
     }
@@ -785,29 +791,29 @@ final class OpenRouterTests: XCTestCase {
 extension OpenRouterTests {
     func testReasoningModelTruncationRetriesWithLargerBudgetAndStrictSchema() async throws {
         var bodies: [[String: Any]] = []
-        let valid = "{\"sections\":[{\"title\":\"Café\",\"theme\":\"Management\",\"paragraphs\":[{\"text\":\"La règle du café.\",\"sources\":[1]}]}],\"corrections\":[]}"
+        let valid = "{\"paragraphs\":[{\"text\":\"La règle du café.\",\"sources\":[1]}],\"corrections\":[]}"
         let client = HTTPMock.client { request in
             bodies.append(try JSONSerialization.jsonObject(with: HTTPMock.body(request)) as! [String: Any])
-            return (200, [:], try HTTPMock.completion(bodies.count == 1 ? "{\"sections\":[" : valid, reason: bodies.count == 1 ? "length" : "stop"))
+            return (200, [:], try HTTPMock.completion(bodies.count == 1 ? "{\"paragraphs\":[" : valid, reason: bodies.count == 1 ? "length" : "stop"))
         }
-        let result = try await client.clean(settings: settings, block: CleanBlock(id: 0, sourceIDs: [UUID()], lines: ["La règle du café."]), knownThemes: [], previous: nil)
-        XCTAssertEqual(result.sections.first?.title, "Café")
+        let result = try await client.clean(settings: settings, block: CleanBlock(id: 0, sourceIDs: [UUID()], lines: ["La règle du café."]))
+        XCTAssertEqual(result.sections.first?.paragraphs.first?.text, "La règle du café.")
         let first = bodies[0], second = bodies[1]
         XCTAssertEqual(first["max_tokens"] as? Int, 16_000); XCTAssertEqual(second["max_tokens"] as? Int, 32_000)
         XCTAssertEqual((first["reasoning"] as? [String: Any])?["effort"] as? String, "low")
         let format = try XCTUnwrap(first["response_format"] as? [String: Any])
         XCTAssertEqual(format["type"] as? String, "json_schema")
         let schema = try XCTUnwrap((format["json_schema"] as? [String: Any])?["schema"] as? [String: Any])
-        XCTAssertEqual(schema["required"] as? [String], ["corrections", "sections"]); XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
+        XCTAssertEqual(schema["required"] as? [String], ["corrections", "paragraphs"]); XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
     }
     func testLocalServerGetsJSONModeWithoutReasoningOrSchema() async throws {
         var body: [String: Any] = [:]
         let client = HTTPMock.client { request in
             body = try JSONSerialization.jsonObject(with: HTTPMock.body(request)) as! [String: Any]
-            return (200, [:], try HTTPMock.completion("{\"sections\":[{\"title\":\"A\",\"theme\":\"B\",\"paragraphs\":[{\"text\":\"Texte.\",\"sources\":[1]}]}]}"))
+            return (200, [:], try HTTPMock.completion("{\"paragraphs\":[{\"text\":\"Texte.\",\"sources\":[1]}]}"))
         }
         let local = AISettings(baseURL: "http://127.0.0.1:8000/v1", model: "local", whisperModel: "small", language: "fr", apiKey: "")
-        _ = try await client.clean(settings: local, block: CleanBlock(id: 0, sourceIDs: [UUID()], lines: ["Texte."]), knownThemes: [], previous: nil)
+        _ = try await client.clean(settings: local, block: CleanBlock(id: 0, sourceIDs: [UUID()], lines: ["Texte."]))
         XCTAssertEqual((body["response_format"] as? [String: String])?["type"], "json_object"); XCTAssertNil(body["reasoning"])
     }
 }
@@ -828,7 +834,7 @@ extension PipelineTests {
             if request.url!.path == "/v1/models" { return (200, [:], Data("{\"data\":[{\"id\":\"local-model\"}]}".utf8)) }
             chats += 1
             if truncate { return (200, [:], try HTTPMock.completion("{", reason: "length")) }
-            return (200, [:], try HTTPMock.completion("{\"sections\":[{\"title\":\"Café\",\"theme\":\"Management\",\"paragraphs\":[{\"text\":\"La règle du café.\",\"sources\":[1]}]}],\"corrections\":[{\"from\":\"café-buf\",\"to\":\"café\"}]}"))
+            return (200, [:], try HTTPMock.completion("{\"paragraphs\":[{\"text\":\"La règle du café.\",\"sources\":[1]}],\"corrections\":[{\"from\":\"café-buf\",\"to\":\"café\"}]}"))
         }
         let pipeline = Pipeline(store: store, client: client, transcriber: transcriber)
         let settings = AISettings(baseURL: "http://127.0.0.1:8000/v1", model: "local-model", whisperModel: "small", language: "fr", apiKey: "")
@@ -841,47 +847,60 @@ extension PipelineTests {
         while pipeline.busy { try await Task.sleep(for: .milliseconds(10)) }
         course = try XCTUnwrap(store.course(id))
         XCTAssertEqual(course.state, .ready); XCTAssertFalse(course.documentSections[0].fallback)
-        XCTAssertEqual(course.documentSections[0].title, "Café"); XCTAssertEqual(course.transcriptFixes.count, 1); XCTAssertEqual(chats, 3)
+        XCTAssertEqual(course.documentSections[0].text, "La règle du café."); XCTAssertEqual(course.transcriptFixes.count, 1); XCTAssertEqual(chats, 3)
         let calls = await transcriber.calls; XCTAssertEqual(calls, 1)
     }
 }
 
 final class CourseSheetTests: XCTestCase {
-    func testThemeSheetValidationCleansAndRejectsEmptySheets() throws {
-        let json = """
-        {"summary":" Synthèse. ","key_points":["Point A","point a"," ","Point B"],"definitions":[{"term":"Terme","definition":"Déf"},{"term":"terme","definition":"Doublon"},{"term":"","definition":"x"}],"examples":[],"exam_hints":["À savoir"]}
-        """
-        let sheet = try JSONDecoder().decode(ThemeSheetResponse.self, from: Data(json.utf8)).sheet(theme: "T")
-        XCTAssertEqual(sheet.summary, "Synthèse."); XCTAssertEqual(sheet.keyPoints, ["Point A", "Point B"])
-        XCTAssertEqual(sheet.definitions.map(\.term), ["Terme"]); XCTAssertEqual(sheet.examHints, ["À savoir"])
-        XCTAssertThrowsError(try JSONDecoder().decode(ThemeSheetResponse.self, from: Data("{\"summary\":\"\",\"key_points\":[\"x\"]}".utf8)).sheet(theme: "T"))
-        XCTAssertThrowsError(try JSONDecoder().decode(ThemeSheetResponse.self, from: Data("{\"summary\":\"S\",\"key_points\":[]}".utf8)).sheet(theme: "T"))
+    func testSourcesAreCutBetweenParagraphsInCourseOrder() {
+        let sections = (0..<5).map { DocumentSection(ids: [UUID()], title: "", theme: "", paragraphs: [CleanParagraph(text: "P\($0) " + String(repeating: "mot ", count: 100), references: [])], fallback: false, edited: false) }
+        let chunks = SheetSources.chunks(sections, maxCharacters: 900)
+        XCTAssertEqual(chunks.count, 3); XCTAssertTrue(chunks[0].hasPrefix("P0 ")); XCTAssertTrue(chunks[2].hasPrefix("P4 "))
+        XCTAssertFalse(chunks.joined().contains("#"), "The model gets the text only: it creates the titles itself.")
     }
-    func testLongThemesAreSplitBySectionAndMerged() {
-        let sections = (0..<5).map { DocumentSection(ids: [UUID()], title: "S\($0)", theme: "T", paragraphs: [CleanParagraph(text: String(repeating: "mot ", count: 100), references: [])], fallback: false, edited: false) }
-        let chunks = SheetMerge.sources(for: ThemeGroup(name: "T", sections: sections), maxCharacters: 900)
-        XCTAssertEqual(chunks.count, 3); XCTAssertTrue(chunks.allSatisfy { $0.hasPrefix("### S") })
-        let merged = SheetMerge.merge([ThemeSheet(theme: "T", summary: "A", keyPoints: ["x", "y"]), ThemeSheet(theme: "T", summary: "B", keyPoints: ["Y", "z"])], theme: "T")
-        XCTAssertEqual(merged.summary, "A\n\nB"); XCTAssertEqual(merged.keyPoints, ["x", "y", "z"])
+    func testModelMarkdownIsUnwrappedAndKeepsLevelOneForTheCourseTitle() {
+        XCTAssertEqual(SheetSources.normalize("```markdown\n# Partie\n\nTexte.\n## Sous-partie\n#hashtag\n```"), "## Partie\n\nTexte.\n### Sous-partie\n#hashtag")
+        XCTAssertEqual(SheetSources.normalize("## Partie\nTexte."), "## Partie\nTexte.")
+    }
+    func testMarkdownBlocksFollowWhateverStructureTheModelChose() {
+        let blocks = MarkdownBlock.parse("## Partie\n\nUne phrase\nsur deux lignes.\n\n- a\n  - b\n1. un\n2. deux\n> cité\n\n| A | B |\n|---|---|\n| 1 | 2 |\n---\n#### Détail ##")
+        XCTAssertEqual(blocks, [.heading(level: 2, text: "Partie"), .paragraph("Une phrase sur deux lignes."), .bullets([(0, "a"), (1, "b")]),
+                                .numbered([("1", "un"), ("2", "deux")]), .quote("cité"), .table([["A", "B"], ["1", "2"]]), .rule, .heading(level: 4, text: "Détail")])
+    }
+    func testSheetsOfPreviousVersionsStayReadable() throws {
+        let json = """
+        {"themes":[{"id":"\(UUID().uuidString)","theme":"Mémoire","summary":"Synthèse.","keyPoints":["Point."],"definitions":[{"term":"Terme","definition":"Sens."}],"examples":[],"examHints":["Examen."]}],
+         "overview":"L’essentiel.","takeaways":["Retenir."],"questions":[{"question":"Q ?","answer":"R."}]}
+        """
+        let sheet = try JSONDecoder().decode(CourseSheet.self, from: Data(json.utf8))
+        XCTAssertTrue(sheet.complete); XCTAssertTrue(sheet.markdown.hasPrefix("## L’essentiel\n\nL’essentiel.\n\n## À retenir\n\n- Retenir.\n\n## Mémoire\n\nSynthèse."))
+        XCTAssertTrue(sheet.markdown.contains("**Terme** : Sens.")); XCTAssertTrue(sheet.markdown.contains("## Questions de révision\n\n**Q ?**\n\nR."))
+        let chapters = try JSONDecoder().decode(CourseSheet.self, from: Data("""
+        {"chapters":[{"id":"\(UUID().uuidString)","title":"Partie","sectionIDs":[],"introduction":"Objet.","blocks":[{"kind":"heading","title":"","text":"A","items":[]},{"kind":"list","title":"","text":"","items":["x"]}]}],"introduction":"Intro.","conclusion":"","questions":[]}
+        """.utf8))
+        XCTAssertEqual(chapters.markdown, "## Introduction\n\nIntro.\n\n## Partie\n\nObjet.\n\n### A\n\n- x")
+        XCTAssertFalse(try JSONDecoder().decode(CourseSheet.self, from: Data("{\"themes\":[],\"takeaways\":[]}".utf8)).complete, "An unfinished sheet is started again.")
+        let again = try JSONDecoder().decode(CourseSheet.self, from: JSONEncoder().encode(sheet))
+        XCTAssertEqual(again.markdown, sheet.markdown); XCTAssertTrue(again.complete)
     }
     func testObsidianNotePutsTheSheetFirstAndTheCleanTextBelow() {
         let p = Passage(start: 0, end: 5, text: "Texte.")
         var course = Course(title: "Cours", parts: [AudioPart(filename: "a.wav", duration: 10, passages: [p])])
         course.cleanBlocks = [CleanBlock(id: 0, sourceIDs: [p.id], lines: ["Texte."], result: CleanResult(sections: [
-            CleanSection(title: "Section", theme: "Thème", paragraphs: [CleanParagraph(text: "Texte nettoyé.", references: [p.id])])]))]
-        course.sheet = CourseSheet(themes: [ThemeSheet(theme: "Thème", summary: "Synthèse.", keyPoints: ["Point."], definitions: [SheetDefinition(term: "Terme", definition: "Sens.")], examHints: ["À l’examen."])],
-                                   overview: "L’essentiel.", takeaways: ["Retenir."], questions: [SheetQuestion(question: "Pourquoi ?", answer: "Parce que.")])
+            CleanSection(title: "", theme: "", paragraphs: [CleanParagraph(text: "Texte nettoyé.", references: [p.id])])]))]
+        course.sheet = CourseSheet(sourceCount: 1, parts: ["## Origines\n\nUn **paragraphe**."])
         let md = ObsidianMarkdown.build(course)
-        XCTAssertTrue(md.contains("> [!abstract] L’essentiel\n> L’essentiel.\n\n## À retenir\n\n- Retenir.\n\n## Thème\n\n`00:00:00`\n\nSynthèse.\n\n**Points clés**\n\n- Point."))
-        XCTAssertTrue(md.contains("- **Terme** : Sens.")); XCTAssertTrue(md.contains("> [!important] Signalé par le professeur\n> - À l’examen."))
-        XCTAssertTrue(md.contains("## Questions de révision\n\n> [!question]- Pourquoi ?\n> Parce que."))
-        XCTAssertTrue(md.contains("## Texte nettoyé\n\n### Thème\n\n#### Section"))
+        XCTAssertTrue(md.contains("# Cours\n\n## Origines\n\nUn **paragraphe**.\n\n## Texte nettoyé\n\n`00:00:00 → 00:00:05`\n\nTexte nettoyé."))
+        XCTAssertFalse(md.contains("themes:")); XCTAssertFalse(md.contains("Fiche incomplète"))
         XCTAssertFalse(ObsidianMarkdown.build(course, includeText: false).contains("Texte nettoyé."))
+        course.sheet?.sourceCount = 2
+        XCTAssertTrue(ObsidianMarkdown.build(course).contains("[!warning] Fiche incomplète"))
     }
 }
 
 extension PipelineTests {
-    @MainActor func testSheetIsBuiltPerThemeThenSummarizedAndResumesAfterFailure() async throws {
+    @MainActor func testSheetIsWrittenFreelyFromTheCleanTextAndResumesAfterFailure() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = CourseStore(root: root); while !store.ready { try await Task.sleep(for: .milliseconds(10)) }
@@ -890,39 +909,36 @@ extension PipelineTests {
         writer.append([Float](repeating: 0, count: 1600)); let written = await writer.finish()
         try await store.update(id) { $0.parts = written.parts; $0.state = .audioReady }
         let transcriber = FakeTranscriber(passages: [Passage(start: 0, end: 0.1, text: "La règle du café. Parler simplement aux interlocuteurs.")])
-        var prompts: [String] = []; var failOverview = true
+        var prompts: [String] = []; var failSheet = true
         let client = HTTPMock.client { request in
             if request.url!.path == "/health" { return (200, [:], Data("{}".utf8)) }
             if request.url!.path == "/v1/models" { return (200, [:], Data("{\"data\":[{\"id\":\"local-model\"}]}".utf8)) }
             let body = try JSONSerialization.jsonObject(with: HTTPMock.body(request)) as! [String: Any]
             let prompt = ((body["messages"] as? [[String: String]])?.last?["content"]) ?? ""; prompts.append(prompt)
             if prompt.contains("lignes numérotées") {
-                return (200, [:], try HTTPMock.completion("{\"sections\":[{\"title\":\"Café\",\"theme\":\"Communication\",\"paragraphs\":[{\"text\":\"La règle du café.\",\"sources\":[1]}]},{\"title\":\"Simplicité\",\"theme\":\"Interlocuteurs\",\"paragraphs\":[{\"text\":\"Parler simplement aux interlocuteurs.\",\"sources\":[1]}]}],\"corrections\":[]}"))
+                return (200, [:], try HTTPMock.completion("{\"paragraphs\":[{\"text\":\"La règle du café.\",\"sources\":[1]},{\"text\":\"Parler simplement aux interlocuteurs.\",\"sources\":[1]}],\"corrections\":[]}"))
             }
-            if prompt.contains("thèmes détectés") { return (200, [:], try HTTPMock.completion("{\"themes\":[{\"name\":\"Communication\",\"includes\":[\"Communication\"]},{\"name\":\"Interlocuteurs\",\"includes\":[\"Interlocuteurs\"]}],\"tags\":[]}")) }
-            if prompt.contains("fiche de cours de cette partie") {
-                XCTAssertTrue(prompt.contains("### ")); XCTAssertFalse(prompt.contains("[1]"), "The sheet is written from the cleaned text, not the raw transcript.")
-                return (200, [:], try HTTPMock.completion("{\"summary\":\"Synthèse.\",\"key_points\":[\"Point.\"],\"definitions\":[],\"examples\":[],\"exam_hints\":[]}"))
-            }
-            if failOverview { return (200, [:], try HTTPMock.completion("pas du JSON")) }
-            return (200, [:], try HTTPMock.completion("{\"overview\":\"L’essentiel.\",\"takeaways\":[\"Retenir.\"],\"questions\":[{\"question\":\"Q ?\",\"answer\":\"R.\"}]}"))
+            XCTAssertTrue(prompt.contains("Rédige la fiche")); XCTAssertTrue(prompt.contains("La règle du café.\n\nParler simplement"))
+            XCTAssertFalse(prompt.contains("[1]"), "The sheet is written from the cleaned text, not the raw transcript.")
+            XCTAssertNil(body["response_format"], "The sheet is free Markdown, not a fixed JSON form.")
+            if failSheet { return (200, [:], try HTTPMock.completion(" ")) }
+            return (200, [:], try HTTPMock.completion("```markdown\n# Communiquer simplement\n\nLa **règle du café** : parler simplement à ses interlocuteurs.\n```"))
         }
         let pipeline = Pipeline(store: store, client: client, transcriber: transcriber)
         var settings = AISettings(baseURL: "http://127.0.0.1:8000/v1", model: "local-model", whisperModel: "small", language: "fr", apiKey: ""); settings.generateSheet = true
         pipeline.process(id: id, settings: settings)
         while pipeline.busy { try await Task.sleep(for: .milliseconds(10)) }
         var course = try XCTUnwrap(store.course(id))
-        XCTAssertEqual(course.state, .failed); XCTAssertEqual(course.sheet?.themes.count, 2); XCTAssertFalse(course.sheetComplete)
-        XCTAssertEqual(prompts.count, 6) // cleaning, themes, two theme sheets, two overview attempts
-        failOverview = false; pipeline.process(id: id, settings: settings)
+        XCTAssertEqual(course.state, .failed); XCTAssertTrue(course.documentComplete); XCTAssertFalse(course.sheetComplete); XCTAssertFalse(course.hasSheet)
+        XCTAssertEqual(prompts.count, 3) // cleaning, two sheet attempts
+        failSheet = false; pipeline.process(id: id, settings: settings)
         while pipeline.busy { try await Task.sleep(for: .milliseconds(10)) }
         course = try XCTUnwrap(store.course(id))
-        XCTAssertEqual(course.state, .ready); XCTAssertTrue(course.sheetComplete); XCTAssertEqual(prompts.count, 7)
-        XCTAssertEqual(course.orderedThemeSheets.map(\.theme), ["Communication", "Interlocuteurs"])
-        XCTAssertEqual(course.sheet?.questions.first?.answer, "R.")
+        XCTAssertEqual(course.state, .ready); XCTAssertTrue(course.sheetComplete); XCTAssertEqual(prompts.count, 4)
+        XCTAssertEqual(course.sheet?.markdown, "## Communiquer simplement\n\nLa **règle du café** : parler simplement à ses interlocuteurs.")
         pipeline.process(id: id, settings: settings, regenerateSheet: true)
         while pipeline.busy { try await Task.sleep(for: .milliseconds(10)) }
-        XCTAssertEqual(prompts.count, 10); XCTAssertTrue(store.course(id)?.sheetComplete == true)
+        XCTAssertEqual(prompts.count, 5); XCTAssertTrue(store.course(id)?.sheetComplete == true)
         let calls = await transcriber.calls; XCTAssertEqual(calls, 1)
     }
 }

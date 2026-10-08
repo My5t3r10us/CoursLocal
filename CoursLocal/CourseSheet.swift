@@ -2,186 +2,157 @@ import Foundation
 
 // MARK: - Stored sheet
 
-struct SheetDefinition: Codable, Hashable, Sendable {
-    var term: String
-    var definition: String
+/// The course sheet, written freely in Markdown by the model from the cleaned text: the model chooses the titles,
+/// the parts and the form. A long course is written in several requests, each continuing the previous ones;
+/// each part is saved so a run can resume.
+struct CourseSheet: Codable, Sendable {
+    var sourceCount = 0
+    var parts: [String] = []
+    var markdown: String { parts.joined(separator: "\n\n") }
+    var complete: Bool { sourceCount > 0 && parts.count >= sourceCount }
+
+    init(sourceCount: Int = 0, parts: [String] = []) { self.sourceCount = sourceCount; self.parts = parts }
+
+    private enum CodingKeys: String, CodingKey { case sourceCount, parts, themes, overview, takeaways, questions, chapters, introduction, conclusion }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let parts = try c.decodeIfPresent([String].self, forKey: .parts) {
+            self.parts = parts; sourceCount = try c.decodeIfPresent(Int.self, forKey: .sourceCount) ?? parts.count
+            return
+        }
+        // Earlier sheets had a fixed form; finished ones are kept as Markdown, unfinished ones are started again.
+        var text: [String] = []
+        if let overview = try c.decodeIfPresent(String.self, forKey: .overview) {
+            text.append("## L’essentiel\n\n" + overview)
+            let takeaways = try c.decodeIfPresent([String].self, forKey: .takeaways) ?? []
+            if !takeaways.isEmpty { text.append("## À retenir\n\n" + takeaways.map { "- " + $0 }.joined(separator: "\n")) }
+            text += (try c.decodeIfPresent([LegacyTheme].self, forKey: .themes) ?? []).map(\.markdown)
+        } else if let introduction = try c.decodeIfPresent(String.self, forKey: .introduction) {
+            text.append("## Introduction\n\n" + introduction)
+            text += (try c.decodeIfPresent([LegacyChapter].self, forKey: .chapters) ?? []).map(\.markdown)
+            if let conclusion = try c.decodeIfPresent(String.self, forKey: .conclusion), !conclusion.isEmpty { text.append("## Conclusion\n\n" + conclusion) }
+        }
+        let questions = try c.decodeIfPresent([LegacyQuestion].self, forKey: .questions) ?? []
+        if !text.isEmpty && !questions.isEmpty {
+            text.append("## Questions de révision\n\n" + questions.map { "**\($0.question)**\n\n\($0.answer)" }.joined(separator: "\n\n"))
+        }
+        parts = text.isEmpty ? [] : [text.joined(separator: "\n\n")]; sourceCount = parts.count
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(sourceCount, forKey: .sourceCount); try c.encode(parts, forKey: .parts)
+    }
 }
 
-struct SheetQuestion: Codable, Hashable, Sendable {
-    var question: String
-    var answer: String
-}
+private struct LegacyQuestion: Decodable { var question: String; var answer: String }
 
-/// The course sheet of one theme, written from the cleaned text of its sections.
-struct ThemeSheet: Codable, Identifiable, Sendable {
-    var id = UUID()
+private struct LegacyTheme: Decodable {
+    struct Definition: Decodable { var term: String; var definition: String }
     var theme: String
     var summary: String
     var keyPoints: [String]
-    var definitions: [SheetDefinition] = []
-    var examples: [String] = []
-    var examHints: [String] = []
+    var definitions: [Definition]?
+    var examples: [String]?
+    var examHints: [String]?
+    var markdown: String {
+        var out = ["## \(theme)", summary, keyPoints.map { "- " + $0 }.joined(separator: "\n")]
+        out += (definitions ?? []).map { "**\($0.term)** : \($0.definition)" }
+        out += (examples ?? []).map { "*Exemple :* " + $0 }
+        out += (examHints ?? []).map { "**Important :** " + $0 }
+        return out.filter { !$0.isEmpty }.joined(separator: "\n\n")
+    }
 }
 
-/// Built theme by theme, then completed by an overview: each step is saved so a run can resume.
-struct CourseSheet: Codable, Sendable {
-    var themes: [ThemeSheet] = []
-    var overview: String? = nil
-    var takeaways: [String] = []
-    var questions: [SheetQuestion] = []
-    var complete: Bool { overview != nil }
+private struct LegacyChapter: Decodable {
+    struct Block: Decodable { var kind: String; var title: String?; var text: String?; var items: [String]? }
+    var title: String
+    var introduction: String?
+    var blocks: [Block]
+    var markdown: String {
+        var out = ["## \(title)", introduction ?? ""]
+        for block in blocks {
+            let title = block.title ?? "", text = block.text ?? "", items = (block.items ?? []).map { "- " + $0 }.joined(separator: "\n")
+            switch block.kind {
+            case "heading": out.append("### " + text)
+            case "subheading": out.append("#### " + text)
+            case "definition": out.append("**\(title)** : \(text)")
+            default: out += [[title.isEmpty ? "" : "**\(title)**", text].filter { !$0.isEmpty }.joined(separator: " : "), items]
+            }
+        }
+        return out.filter { !$0.isEmpty }.joined(separator: "\n\n")
+    }
 }
 
 extension Course {
     var sheetComplete: Bool { sheet?.complete == true }
-    /// Theme sheets in the order of the document, whatever order they were generated in.
-    var orderedThemeSheets: [ThemeSheet] {
-        let order = themeGroups.map(\.name)
-        return (sheet?.themes ?? []).sorted { (order.firstIndex(of: $0.theme) ?? .max) < (order.firstIndex(of: $1.theme) ?? .max) }
-    }
-    var sheetText: String {
-        guard let sheet else { return "" }
-        return ([sheet.overview ?? ""] + sheet.takeaways + sheet.themes.flatMap { [$0.theme, $0.summary] + $0.keyPoints + $0.definitions.map { "\($0.term) \($0.definition)" } + $0.examples }
-                + sheet.questions.flatMap { [$0.question, $0.answer] }).joined(separator: "\n")
-    }
+    var hasSheet: Bool { !(sheet?.markdown.trimmed.isEmpty ?? true) }
+    var sheetText: String { sheet?.markdown ?? "" }
 }
 
-// MARK: - Model responses
-
-struct ThemeSheetResponse: Decodable {
-    struct Definition: Decodable { var term: String; var definition: String }
-    var summary: String
-    var key_points: [String]?
-    var definitions: [Definition]?
-    var examples: [String]?
-    var exam_hints: [String]?
-
-    func sheet(theme: String) throws -> ThemeSheet {
-        func clean(_ items: [String]?, _ limit: Int) -> [String] {
-            var seen = Set<String>()
-            return (items ?? []).map(\.trimmed).filter { !$0.isEmpty && seen.insert($0.folded).inserted }.prefix(limit).map { $0 }
-        }
-        let summary = summary.trimmed, points = clean(key_points, 12)
-        guard !summary.isEmpty, !points.isEmpty else { throw CourseError.invalidOutput("Fiche sans synthèse ni points clés.") }
-        var terms = Set<String>()
-        let definitions = (definitions ?? []).map { SheetDefinition(term: $0.term.trimmed, definition: $0.definition.trimmed) }
-            .filter { !$0.term.isEmpty && !$0.definition.isEmpty && terms.insert($0.term.folded).inserted }
-        return ThemeSheet(theme: theme, summary: summary, keyPoints: points, definitions: Array(definitions.prefix(15)),
-                          examples: clean(examples, 8), examHints: clean(exam_hints, 6))
-    }
-}
-
-struct OverviewResponse: Decodable {
-    struct Question: Decodable { var question: String; var answer: String }
-    var overview: String
-    var takeaways: [String]?
-    var questions: [Question]?
-
-    func apply(to sheet: inout CourseSheet) throws {
-        guard !overview.trimmed.isEmpty else { throw CourseError.invalidOutput("Synthèse du cours vide.") }
-        var seen = Set<String>()
-        sheet.overview = overview.trimmed
-        sheet.takeaways = (takeaways ?? []).map(\.trimmed).filter { !$0.isEmpty && seen.insert($0.folded).inserted }.prefix(10).map { $0 }
-        sheet.questions = (questions ?? []).map { SheetQuestion(question: $0.question.trimmed, answer: $0.answer.trimmed) }
-            .filter { !$0.question.isEmpty && !$0.answer.isEmpty }.prefix(8).map { $0 }
-    }
-}
-
-enum SheetMerge {
-    /// A theme too long for one request is summarized in parts; the parts are joined without another call.
-    static func merge(_ parts: [ThemeSheet], theme: String) -> ThemeSheet {
-        guard parts.count > 1 else { return parts.first ?? ThemeSheet(theme: theme, summary: "", keyPoints: []) }
-        func unique(_ items: [String]) -> [String] { var seen = Set<String>(); return items.filter { seen.insert($0.folded).inserted } }
-        var terms = Set<String>()
-        return ThemeSheet(theme: theme, summary: parts.map(\.summary).joined(separator: "\n\n"),
-                          keyPoints: unique(parts.flatMap(\.keyPoints)),
-                          definitions: parts.flatMap(\.definitions).filter { terms.insert($0.term.folded).inserted },
-                          examples: unique(parts.flatMap(\.examples)), examHints: unique(parts.flatMap(\.examHints)))
-    }
-    /// Splits the cleaned sections of a theme into sources that fit one request, never cutting a section.
-    static func sources(for group: ThemeGroup, maxCharacters: Int) -> [String] {
+enum SheetSources {
+    /// Splits the cleaned text into sources that fit one request, between paragraphs and in the order of the course.
+    static func chunks(_ sections: [DocumentSection], maxCharacters: Int) -> [String] {
         var chunks: [String] = []; var current = ""
-        for section in group.sections {
-            let piece = "### \(section.title)\n\n\(section.text)"
-            if !current.isEmpty && current.count + piece.count > maxCharacters { chunks.append(current); current = "" }
-            current += (current.isEmpty ? "" : "\n\n") + piece
+        for paragraph in sections.flatMap(\.paragraphs).map(\.text) where !paragraph.trimmed.isEmpty {
+            if !current.isEmpty && current.count + paragraph.count > maxCharacters { chunks.append(current); current = "" }
+            current += (current.isEmpty ? "" : "\n\n") + paragraph
         }
         if !current.isEmpty { chunks.append(current) }
         return chunks
+    }
+
+    /// Removes what the model may wrap around the Markdown and keeps level 1 free for the course title.
+    static func normalize(_ text: String) -> String {
+        var lines = text.trimmed.components(separatedBy: "\n")
+        if lines.first?.hasPrefix("```") == true { lines.removeFirst() }
+        if lines.last?.trimmed == "```" { lines.removeLast() }
+        if lines.contains(where: { $0.hasPrefix("# ") }) {
+            lines = lines.map { $0.hasPrefix("#") && $0.drop { $0 == "#" }.hasPrefix(" ") && !$0.hasPrefix("######") ? "#" + $0 : $0 }
+        }
+        return lines.joined(separator: "\n").trimmed
+    }
+
+    static func headings(_ markdown: String) -> [String] {
+        markdown.components(separatedBy: "\n").filter { $0.hasPrefix("#") }
     }
 }
 
 // MARK: - Requests
 
 extension RapidMLXClient {
-    static let themeSheetInstruction = """
-    Voici une partie d'un cours oral, déjà nettoyée et découpée en sections. Rédige la fiche de cours de cette partie, comme le ferait un excellent étudiant qui prépare ses révisions.
-    - "summary" : une synthèse rédigée de 3 à 6 phrases qui explique les idées dans un ordre logique. Écris le contenu lui-même (« La mémoire de travail… »), jamais « le professeur explique que… ».
-    - "key_points" : 3 à 8 points essentiels ; chacun est une phrase autonome, précise, avec les chiffres, noms, conditions et nuances donnés dans le cours.
-    - "definitions" : les notions définies ou employées comme termes techniques, avec une définition fidèle au cours. Liste vide s'il n'y en a pas.
-    - "examples" : les exemples, cas concrets ou anecdotes cités, résumés en une phrase qui dit ce qu'ils illustrent. Liste vide s'il n'y en a pas.
-    - "exam_hints" : ce que le professeur signale comme important, à savoir, ou susceptible de tomber à l'examen. Liste vide s'il ne le fait pas.
-    N'ajoute aucune information absente de la source. Ignore les apartés, digressions et passages manifestement mal transcrits plutôt que d'inventer leur sens. Rédige dans la langue du cours.
-    Réponds uniquement avec ce JSON : {"summary":"…","key_points":["…"],"definitions":[{"term":"…","definition":"…"}],"examples":["…"],"exam_hints":["…"]}
+    static let sheetInstruction = """
+    Voici le texte nettoyé d'un cours oral. Rédige la fiche de cours correspondante, en Markdown.
+    - But : résumer. Écris de petits paragraphes de 2 à 4 phrases, va à l'essentiel, supprime les redites, les digressions et les tournures orales, sans perdre les notions, définitions, chiffres, exemples utiles ni ce que le professeur signale comme important.
+    - Structure : c'est à toi de la choisir, selon le contenu de ce cours. Crée les titres, sous-titres et parties qui le rendent le plus clair (## pour les grandes parties, ### et #### en dessous) ; regroupe les idées liées même si elles sont dispersées dans la source. N'écris pas de titre de niveau # : le titre du cours est déjà affiché.
+    - Forme : privilégie les petits paragraphes. Utilise une liste, du gras ou un tableau seulement quand c'est vraiment plus clair.
+    Écris le contenu lui-même (« La mémoire de travail… »), jamais « le professeur explique que… ». N'ajoute aucune information absente de la source. Ignore les passages manifestement mal transcrits plutôt que d'inventer leur sens. Rédige dans la langue du cours.
+    Réponds uniquement avec la fiche en Markdown, sans phrase d'introduction ni commentaire.
     """
-    static let overviewInstruction = """
-    Voici les fiches de chaque partie d'un cours, dans l'ordre. Rédige la synthèse globale de la fiche de cours :
-    - "overview" : l'essentiel du cours en 4 à 8 phrases : sujet, problématique, enchaînement des parties et conclusion.
-    - "takeaways" : 5 à 10 points à retenir absolument, formulés comme des affirmations précises.
-    - "questions" : 4 à 8 questions de révision variées (définition, explication, application) avec une réponse courte et exacte.
-    Appuie-toi uniquement sur ces fiches ; n'ajoute aucune connaissance extérieure. Rédige dans la langue du cours.
-    Réponds uniquement avec ce JSON : {"overview":"…","takeaways":["…"],"questions":[{"question":"…","answer":"…"}]}
-    """
-    static let themeSheetSchema = object([
-        "summary": ["type": "string"], "key_points": array(["type": "string"]),
-        "definitions": array(object(["term": ["type": "string"], "definition": ["type": "string"]])),
-        "examples": array(["type": "string"]), "exam_hints": array(["type": "string"])
-    ])
-    static let overviewSchema = object([
-        "overview": ["type": "string"], "takeaways": array(["type": "string"]),
-        "questions": array(object(["question": ["type": "string"], "answer": ["type": "string"]]))
-    ])
 
-    /// Same retry policy as cleaning: one corrective attempt, a larger budget after a truncated answer.
-    private func sheetRequest<R>(settings: AISettings, instruction: String, source: String, schema: (name: String, value: [String: Any]), parse: (Data) throws -> R) async throws -> R {
-        var tokens = settings.provider == .openRouter ? 16_000 : 3000
+    func sheetSourceLimit(_ settings: AISettings) -> Int { settings.provider == .openRouter ? 60_000 : 6000 }
+
+    /// Writes the sheet of one source. After the first source, the model continues the sheet already written.
+    func sheetPart(settings: AISettings, courseTitle: String, source: String, written: String) async throws -> String {
+        var instruction = Self.sheetInstruction + "\nCours : « \(courseTitle) »."
+        if !written.isEmpty {
+            let headings = SheetSources.headings(written).suffix(40).joined(separator: "\n")
+            instruction += "\nCette source est la suite du cours. La fiche déjà rédigée a ces titres :\n\(headings.isEmpty ? "(aucun)" : headings)\n"
+                + "Elle se termine ainsi : « …\(written.suffix(400)) »\n"
+                + "Écris uniquement la suite de la fiche : poursuis la partie en cours ou ouvre de nouvelles parties si le sujet change, sans répéter ce qui précède."
+        }
+        var tokens = settings.provider == .openRouter ? 16_000 : 4000
         var task = instruction
         for attempt in 0...1 {
             do {
-                let text = try await generate(settings: settings, task: task, source: source, schema: schema, maxTokens: tokens)
-                return try parse(Data(Self.jsonObject(text).utf8))
+                let text = SheetSources.normalize(try await generate(settings: settings, task: task, source: source, maxTokens: tokens))
+                guard text.count >= min(200, source.count / 10) else { throw CourseError.invalidOutput("Fiche vide ou trop courte.") }
+                return text
             } catch where CourseError.isModelOutput(error) {
                 if attempt == 1 { throw CourseError.invalidOutput("La fiche n’a pas pu être générée : \(error.localizedDescription) Réessaie ou choisis un autre modèle.") }
                 if case .truncated = error as? CourseError { tokens = min(settings.provider == .openRouter ? 64_000 : 8000, tokens * 2) }
-                task = instruction + "\nLa tentative précédente était invalide (\(error.localizedDescription)). Respecte exactement le JSON demandé."
+                task = instruction + "\nLa tentative précédente était invalide (\(error.localizedDescription)). Réponds uniquement avec la fiche en Markdown."
             }
         }
         throw CourseError.invalidOutput("Fiche invalide.")
-    }
-
-    func themeSheet(settings: AISettings, group: ThemeGroup, courseTitle: String) async throws -> ThemeSheet {
-        let limit = settings.provider == .openRouter ? 24_000 : 6000
-        let instruction = Self.themeSheetInstruction + "\nCours : « \(courseTitle) ». Partie : « \(group.name) »."
-        var parts: [ThemeSheet] = []
-        for source in SheetMerge.sources(for: group, maxCharacters: limit) {
-            parts.append(try await sheetRequest(settings: settings, instruction: instruction, source: source, schema: ("theme_sheet", Self.themeSheetSchema)) {
-                try JSONDecoder().decode(ThemeSheetResponse.self, from: $0).sheet(theme: group.name)
-            })
-        }
-        return SheetMerge.merge(parts, theme: group.name)
-    }
-
-    /// Returns the sheet completed with the overview, takeaways and revision questions.
-    func overview(settings: AISettings, courseTitle: String, sheet: CourseSheet, themes: [ThemeSheet]) async throws -> CourseSheet {
-        let source = themes.map { theme in
-            "## \(theme.theme)\n\(theme.summary)\n" + theme.keyPoints.map { "- \($0)" }.joined(separator: "\n")
-                + (theme.definitions.isEmpty ? "" : "\nDéfinitions : " + theme.definitions.map { "\($0.term) : \($0.definition)" }.joined(separator: " ; "))
-        }.joined(separator: "\n\n")
-        return try await sheetRequest(settings: settings, instruction: Self.overviewInstruction + "\nCours : « \(courseTitle) ».",
-                                      source: source, schema: ("course_overview", Self.overviewSchema)) { data in
-            var completed = sheet
-            try JSONDecoder().decode(OverviewResponse.self, from: data).apply(to: &completed)
-            return completed
-        }
     }
 }

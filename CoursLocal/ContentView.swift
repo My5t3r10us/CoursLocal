@@ -249,7 +249,7 @@ struct CourseRow: View {
     let course: Course
     let activity: String?
     var body: some View {
-        let themes = course.themeGroups.map(\.name)
+        let themes = course.themeNames
         HStack(alignment: .top, spacing: 10) {
             ZStack {
                 Circle().fill(course.state.tint.opacity(0.15))

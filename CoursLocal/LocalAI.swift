@@ -353,39 +353,31 @@ final class RapidMLXClient: @unchecked Sendable {
     }
     static let cleaningInstruction = """
     Voici un extrait de la transcription automatique d'un cours, en lignes numérotées.
-    1. Nettoie le texte : retire les tics de langage et hésitations (euh, ben, bon, bah, du coup, en fait, voilà, genre, tu vois, quoi, hein, enfin explétif, alors de remplissage), les faux départs, les répétitions et les apartés sans contenu.
+    1. Retire les tics de langage et hésitations (euh, ben, bon, bah, du coup, en fait, voilà, genre, tu vois, quoi, hein, enfin explétif, alors de remplissage), les faux départs et les répétitions.
     2. Corrige les erreurs de transcription : homophones, mots mal reconnus, termes techniques ou noms propres déformés, ponctuation, majuscules, accords. Corrige seulement quand le contexte rend la correction certaine.
-    3. Conserve tout le contenu : idées, détails, chiffres, exemples et formulations du professeur. Ne résume pas, ne reformule pas au-delà du nécessaire, n'ajoute rien.
-    4. Découpe le texte nettoyé en paragraphes cohérents (une idée par paragraphe), puis regroupe-les en sections dans l'ordre du cours. Chaque section a un titre court et précis et un thème général.
+    3. Réécris correctement chaque phrase, en français écrit clair, sans changer ce qui est dit.
+    4. Ne restructure pas : garde l'ordre exact du texte, ne résume pas, ne déplace rien, n'ajoute ni titre ni intertitre, n'ajoute aucune information. Conserve les idées, détails, chiffres et exemples du professeur.
+    5. Découpe seulement le texte en paragraphes, dans l'ordre, avec un nouveau paragraphe à chaque changement d'idée.
     Réponds uniquement avec ce JSON :
-    {"sections":[{"title":"titre court de la section","theme":"thème général","paragraphs":[{"text":"paragraphe nettoyé","sources":[1,2]}]}],"corrections":[{"from":"mot tel que transcrit","to":"mot corrigé"}]}
+    {"paragraphs":[{"text":"paragraphe réécrit","sources":[1,2]}],"corrections":[{"from":"mot tel que transcrit","to":"mot corrigé"}]}
     "sources" contient les numéros des lignes utilisées par le paragraphe. Chaque ligne doit être utilisée. "corrections" liste uniquement les erreurs de transcription corrigées, pas les tics retirés.
     """
 
-    /// Cleans one block of transcript and splits it into paragraphs and themed sections.
-    /// `knownThemes` keeps theme names consistent from one block to the next.
-    func clean(settings: AISettings, block: CleanBlock, knownThemes: [String], previous: CleanSection?) async throws -> CleanResult {
-        var context = ""
-        if !knownThemes.isEmpty {
-            context += "\nThèmes déjà identifiés dans le cours : " + knownThemes.suffix(20).map { "« \($0) »" }.joined(separator: ", ")
-            context += ". Réutilise exactement l'un de ces noms quand le passage en relève ; crée un nouveau thème seulement si le sujet change vraiment."
-        }
-        if let previous {
-            context += "\nLa section précédente s'intitule « \(previous.title) » (thème « \(previous.theme) »). Si le début de l'extrait la prolonge, reprends exactement ce titre et ce thème."
-        }
-        let fallbackTheme = previous?.theme ?? knownThemes.last ?? "Général"
+    /// Rewrites one block of transcript correctly and splits it into paragraphs, in the order of the course.
+    /// Titles and parts are left to the course sheet.
+    func clean(settings: AISettings, block: CleanBlock) async throws -> CleanResult {
         // The answer is about as long as the source plus JSON; cloud usage is billed per token used, so its ceiling is generous.
         var tokens = settings.provider == .openRouter ? max(16_000, block.characterCount * 2) : min(8000, max(2000, block.characterCount + 1200))
-        var instruction = Self.cleaningInstruction + context
+        var instruction = Self.cleaningInstruction
         for attempt in 0...1 {
             do {
                 let text = try await generate(settings: settings, task: instruction, source: block.prompt, schema: ("cleaned_transcript", Self.cleaningSchema), maxTokens: tokens)
                 let response = try JSONDecoder().decode(CleanResponse.self, from: Data(Self.jsonObject(text).utf8))
-                return try response.result(for: block, fallbackTheme: fallbackTheme)
+                return try response.result(for: block)
             } catch where CourseError.isModelOutput(error) {
                 if attempt == 1 { throw CourseError.invalidOutput("Deux réponses inutilisables — \(error.localizedDescription)") }
                 if case .truncated = error as? CourseError { tokens = min(settings.provider == .openRouter ? 64_000 : 12_000, tokens * 2) }
-                instruction = Self.cleaningInstruction + context + "\nLa tentative précédente était invalide (\(error.localizedDescription)). Respecte exactement le JSON demandé, conserve tout le contenu et référence chaque ligne."
+                instruction = Self.cleaningInstruction + "\nLa tentative précédente était invalide (\(error.localizedDescription)). Respecte exactement le JSON demandé, conserve tout le contenu et référence chaque ligne."
             }
         }
         throw CourseError.message("Résultat IA invalide.")
@@ -419,10 +411,7 @@ final class RapidMLXClient: @unchecked Sendable {
     }
     static func array(_ items: [String: Any]) -> [String: Any] { ["type": "array", "items": items] }
     static let cleaningSchema = object([
-        "sections": array(object([
-            "title": ["type": "string"], "theme": ["type": "string"],
-            "paragraphs": array(object(["text": ["type": "string"], "sources": array(["type": "integer"])]))
-        ])),
+        "paragraphs": array(object(["text": ["type": "string"], "sources": array(["type": "integer"])])),
         "corrections": array(object(["from": ["type": "string"], "to": ["type": "string"]]))
     ])
     static let themeSchema = object([

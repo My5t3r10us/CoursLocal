@@ -92,26 +92,26 @@ Le bouton bulle, à droite des onglets d’un cours, ouvre le panneau **Question
 
 Le texte nettoyé est envoyé s’il existe, sinon la transcription. En cloud, un cours de deux heures part en entier ; en local (environ 12 000 caractères), seules les sections qui partagent le plus de mots avec la question et la précédente sont envoyées, dans l’ordre du cours. La conversation est conservée avec le cours mais n’est jamais exportée vers Obsidian. Une question continue si l’on change de cours.
 
-## Nettoyage, paragraphes et thèmes
+## Nettoyage et fiche de cours
 
 1. **Transcription** : Whisper transcrit les segments dans l’ordre, puis est libéré avant le nettoyage.
 2. **Filtrage déterministe** : avant tout appel au modèle, les hésitations évidentes (« euh », « hum », « bah », « hein »…), les bégaiements (« de de », « c’est c’est »), les annotations Whisper (`[Musique]`, `(rires)`) et les phrases inventées sur les silences (« Sous-titrage… », « Merci d’avoir regardé… ») sont retirés. Les répétitions légitimes (« nous nous », « très très ») sont conservées.
-3. **Nettoyage par le modèle** : la transcription est découpée en blocs d’environ 3 000 caractères, **sans chevauchement**, en lignes numérotées. Pour chaque bloc, le modèle retire les tics dépendants du contexte (« du coup », « en fait », « voilà »…), corrige les erreurs de transcription certaines, puis regroupe le texte en paragraphes et en sections titrées, chacune rattachée à un thème. Les thèmes déjà trouvés et la section précédente lui sont rappelés pour garder des noms cohérents.
+3. **Nettoyage par le modèle** : la transcription est découpée en blocs d’environ 3 000 caractères, **sans chevauchement**, en lignes numérotées. Pour chaque bloc, le modèle retire les tics dépendants du contexte (« du coup », « en fait », « voilà »…), corrige les erreurs de transcription certaines et **réécrit correctement** chaque phrase, puis découpe le texte en paragraphes. Il **ne restructure pas** : l’ordre du cours est conservé, sans résumé, sans titre ni thème. Les titres et les parties sont créés par la fiche de cours.
 4. **Contrôles** : une réponse qui perd du contenu (moins de 45 % du texte source), en invente (plus de 160 %) ou ne référence pas la moitié des lignes est refusée ; une seule nouvelle tentative est faite. Les corrections annoncées dont le mot d’origine n’existe pas dans la source sont ignorées. Une réponse tronquée (limite de tokens atteinte) est redemandée avec un budget doublé. Si le modèle échoue deux fois, le passage est conservé avec le seul filtrage déterministe et marqué **« Nettoyage simplifié »**, avec la cause affichée, au lieu de bloquer le cours ; **Réessayer** renvoie uniquement ces passages au modèle. Les erreurs de connexion, elles, arrêtent le traitement.
-5. **Harmonisation des thèmes** : une dernière requête, qui ne contient que les noms de thèmes, fusionne les synonymes (2 à 8 thèmes) et propose des mots-clés. En cas de réponse invalide, les thèmes détectés sont gardés tels quels.
+5. **Thèmes (anciens cours)** : les documents nettoyés avant la version 0.4 gardent leurs sections titrées et leurs thèmes ; une harmonisation des thèmes n’est faite que pour eux.
 
-6. **Fiche de cours** (désactivable dans Réglages → Général) : à partir du **texte nettoyé**, une requête par thème produit une synthèse rédigée, 3 à 8 points clés, les définitions, les exemples cités et ce que le professeur signale comme important (examen, « à savoir »). Un thème trop long est traité en plusieurs parties, sans couper une section, puis fusionné. Une dernière requête rédige **l’essentiel** du cours, 5 à 10 points **à retenir** et 4 à 8 **questions de révision** avec réponse. Les consignes interdisent d’ajouter des connaissances extérieures et demandent d’ignorer les passages incompréhensibles plutôt que de deviner.
+6. **Fiche de cours** (désactivable dans Réglages → Général) : à partir du **texte nettoyé**, le modèle rédige librement la fiche en Markdown. Il **choisit lui-même la structure** (titres, sous-titres, parties, et forme : paragraphes, listes, tableaux) selon le contenu du cours ; aucune forme n’est imposée. Le but est de **résumer en petits paragraphes** de 2 à 4 phrases, sans perdre les notions, chiffres, exemples utiles ni ce que le professeur signale comme important. En cloud, un cours d’environ une heure tient en une seule requête ; sinon le texte est découpé entre deux paragraphes et chaque suite reçoit les titres déjà écrits et la fin de la fiche pour la continuer. Les consignes interdisent d’ajouter des connaissances extérieures et demandent d’ignorer les passages incompréhensibles plutôt que de deviner. Les fiches des versions précédentes restent lisibles, converties en Markdown ; **Régénérer la fiche** les refait au nouveau format.
 
-Chaque étape est sauvegardée atomiquement : une relance réutilise la transcription, les blocs déjà nettoyés et les fiches de thèmes déjà rédigées. **Régénérer la fiche** la recrée à partir du texte nettoyé actuel, corrections manuelles comprises, sans refaire le reste. Les erreurs HTTP temporaires sont réessayées au maximum deux fois, en respectant `Retry-After`.
+Chaque étape est sauvegardée atomiquement : une relance réutilise la transcription, les blocs déjà nettoyés et les parties de fiche déjà rédigées. **Régénérer la fiche** la recrée à partir du texte nettoyé actuel, corrections manuelles comprises, sans refaire le reste. Les erreurs HTTP temporaires sont réessayées au maximum deux fois, en respectant `Retry-After`.
 
 Un seul enregistrement, import, traitement ou changement de données peut être actif à la fois. Une capture interrompue exige d’abord une vérification manuelle. Si un segment est illisible, **Traiter les portions valides** demande d’accepter explicitement un cours incomplet.
 
 ## Interface
 
 - **Bibliothèque** groupée par date (aujourd’hui, hier, 7 derniers jours…), avec état, durée et thèmes de chaque cours, recherche dans les titres, transcriptions, documents et thèmes, et un indicateur de l’IA locale. La vérification automatique ne lit pas le trousseau ; ↻ refait la vérification avec la clé API.
-- **Bandeaux** d’enregistrement (niveaux micro/application, pause, fin) et de traitement (étapes Vérification → Transcription → Nettoyage → Thèmes, interruption).
-- **Fiche** (onglet par défaut) : l’essentiel, à retenir, fiche par thème (synthèse, points clés, définitions, exemples, remarques du professeur, accès à l’audio) et questions de révision à réponse masquée.
-- **Texte nettoyé** : lecture par thème ou dans l’ordre chronologique, plan cliquable à droite, horodatage de chaque section pour réécouter le passage, mise en évidence de la section en cours de lecture, liste des corrections de transcription. Chaque section se modifie (titre, thème, paragraphes) et chaque thème se renomme (donner le nom d’un autre thème fusionne les deux).
+- **Bandeaux** d’enregistrement (niveaux micro/application, pause, fin) et de traitement (étapes Vérification → Transcription → Nettoyage → Fiche, interruption).
+- **Fiche** (onglet par défaut) : la fiche telle que le modèle l’a structurée (titres, paragraphes, listes, tableaux, citations), avec un plan cliquable à droite construit à partir de ses titres.
+- **Texte nettoyé** : le texte réécrit dans l’ordre du cours, par passages horodatés pour réécouter, avec plan cliquable à droite, mise en évidence du passage en cours de lecture et liste des corrections de transcription. Chaque passage se modifie. Les anciens cours gardent leurs sections titrées, la lecture par thème et le renommage des thèmes.
 - **Transcription** brute horodatée, filtrable, avec correction par passage. Une correction marque le document **obsolète** ; **Régénérer** demande confirmation avant de remplacer le document et ses modifications.
 - **Markdown** : aperçu exact du fichier exporté.
 - **Archives** : notes, fiches et résumés produits par la version 0.2, conservés en lecture seule.
@@ -123,11 +123,11 @@ Un seul enregistrement, import, traitement ou changement de données peut être 
 
 La note contient :
 
-- la **fiche de cours** en tête : encadré `[!abstract] L’essentiel`, `## À retenir`, une section `##` par thème (synthèse, **Points clés**, **Définitions**, **Exemples**, encadré `[!important] Signalé par le professeur`) et `## Questions de révision` en encadrés `[!question]-` repliables ;
-- puis `## Texte nettoyé` (thèmes en `###`, sections en `####`), facultatif ;
-- des **propriétés YAML** : `title`, `date`, `duration`, `source`, `language`, `tags` (`cours` + mots-clés + thèmes), `themes`, et `status` si le cours est incomplet ou obsolète ;
-- un **sommaire** de liens `[[#Thème]]` lorsqu’il y a plusieurs thèmes ;
-- les thèmes en `##`, les sections en `###` avec leur plage horaire (ou, en mode chronologique, les sections en `##` suivies de leur `#tag` de thème) ;
+- la **fiche de cours** en tête, telle que le modèle l’a rédigée (ses parties en `##`, ses sous-parties en `###` et `####`), avec un avertissement si elle est incomplète ;
+- puis `## Texte nettoyé` (passages horodatés ; pour les anciens cours, thèmes en `###` et sections en `####`), facultatif ;
+- des **propriétés YAML** : `title`, `date`, `duration`, `source`, `language`, `tags` (`cours`, plus les mots-clés et thèmes des anciens cours), `themes` pour les anciens cours, et `status` si le cours est incomplet ou obsolète ;
+- pour les anciens cours, un **sommaire** de liens `[[#Thème]]` lorsqu’il y a plusieurs thèmes ;
+- pour les anciens cours, les thèmes en `##`, les sections en `###` avec leur plage horaire (ou, en mode chronologique, les sections en `##` suivies de leur `#tag` de thème) ;
 - des **encadrés** Obsidian : avertissements (`[!warning]`), passages simplifiés (`[!caution]`), corrections de transcription en tableau (`[!info]-`, repliable), anciens résultats (`[!note]-`) et transcription brute (`[!quote]-`, facultative).
 
 ## Stockage et migration
@@ -180,7 +180,7 @@ La suite couvre notamment :
 - **deux heures de signal synthétique**, écrites en 24 segments puis relues : comparaison des 115,2 millions d’échantillons ;
 - mixage des sources et exclusion du temps passé en pause ;
 - migration avec sauvegarde, récupération du manifeste, conservation des fichiers illisibles ;
-- correction sans perte des éditions et reprise après échec de l’harmonisation des thèmes ;
+- correction sans perte des éditions, reprise après échec du nettoyage sans retranscrire, et fiche rédigée librement en Markdown avec reprise après échec ;
 - rendu de l’interface avec un cours de démonstration ;
 - transfert iPhone → Mac réel en boucle locale : création du cours, durées relues, renvoi sans doublon, code incorrect, audio illisible refusé sans rien garder, attente quand le Mac est occupé, réparation d’un WAV interrompu ;
 - canal de contrôle : état en direct, relais des commandes, erreur de l’iPhone signalée une seule fois, envoi d’un enregistrement pendant le contrôle, perte de connexion pendant un enregistrement, code d’appairage exigé.
