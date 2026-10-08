@@ -215,6 +215,7 @@ Ces tests automatisés ne remplacent pas les essais suivants :
 - `CourseDetailView.swift` : détail d’un cours (document, transcription, Markdown, archives, plan).
 - `Components.swift` : lecteur audio et composants partagés.
 - `SettingsView.swift` : réglages (transcription, IA locale ou OpenRouter avec catalogue des modèles, Obsidian, général).
+- `Tools/make-icons.swift` : dessine l’icône (bulle de parole : une onde sonore devenue texte) et régénère les catalogues `AppIcon` du Mac et de l’iPhone : `swift Tools/make-icons.swift`. Autres styles : `livre`, `onde`, `toque`, `feuille` en argument ; `--preview fichier.png` les compare.
 - `CoursLocalTests/` : tests et serveur HTTP de test facultatif.
 
 Références : [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift), [API Rapid MLX](https://rapidmlx.com/docs/api), [ScreenCaptureKit](https://developer.apple.com/documentation/screencapturekit).

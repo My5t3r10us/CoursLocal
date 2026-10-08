@@ -28,6 +28,8 @@
 		000000000000000000000102 /* PhoneTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000100 /* PhoneTransfer.swift */; };
 		000000000000000000000104 /* PhoneReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000103 /* PhoneReceiver.swift */; };
 		00000000000000000000011D /* PhoneRemoteViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000011C /* PhoneRemoteViews.swift */; };
+		000000000000000000000121 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000120 /* Assets.xcassets */; };
+		000000000000000000000123 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000122 /* Assets.xcassets */; };
 		000000000000000000000106 /* CoursLocalMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000105 /* CoursLocalMobileApp.swift */; };
 		000000000000000000000108 /* MobileRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000107 /* MobileRecorder.swift */; };
 		00000000000000000000010A /* MacLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000109 /* MacLink.swift */; };
@@ -70,6 +72,8 @@
 		000000000000000000000100 /* PhoneTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneTransfer.swift; sourceTree = "<group>"; };
 		000000000000000000000103 /* PhoneReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneReceiver.swift; sourceTree = "<group>"; };
 		00000000000000000000011C /* PhoneRemoteViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneRemoteViews.swift; sourceTree = "<group>"; };
+		000000000000000000000120 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		000000000000000000000122 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		000000000000000000000105 /* CoursLocalMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoursLocalMobileApp.swift; sourceTree = "<group>"; };
 		000000000000000000000107 /* MobileRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileRecorder.swift; sourceTree = "<group>"; };
 		000000000000000000000109 /* MacLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLink.swift; sourceTree = "<group>"; };
@@ -139,6 +143,7 @@
 				00000000000000000000003E /* CourseChat.swift */,
 				000000000000000000000103 /* PhoneReceiver.swift */,
 				00000000000000000000011C /* PhoneRemoteViews.swift */,
+				000000000000000000000120 /* Assets.xcassets */,
 			);
 			path = CoursLocal;
 			sourceTree = "<group>";
@@ -178,6 +183,7 @@
 				000000000000000000000109 /* MacLink.swift */,
 				00000000000000000000010B /* MobileViews.swift */,
 				00000000000000000000011E /* MacRemote.swift */,
+				000000000000000000000122 /* Assets.xcassets */,
 				00000000000000000000010D /* Info.plist */,
 			);
 			path = CoursLocalMobile;
@@ -291,6 +297,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				000000000000000000000121 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -305,6 +312,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				000000000000000000000123 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -419,6 +427,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.baptiste.CoursLocal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -437,6 +446,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.baptiste.CoursLocal;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -491,6 +501,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.baptiste.CoursLocal.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -514,6 +525,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.baptiste.CoursLocal.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
